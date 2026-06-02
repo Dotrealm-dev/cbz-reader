@@ -4,7 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>CBZ Reader Local</title>
+
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
   <style>
     :root {
       --bg: #0f1115;
@@ -19,7 +21,6 @@
       --thumb-w: 112px;
       --topbar-h: 62px;
       --zoom: 1;
-      --strip-width: 100%;
     }
 
     * { box-sizing: border-box; }
@@ -127,15 +128,14 @@
       overflow: hidden;
       background: var(--reader-bg);
       position: relative;
-      touch-action: pan-y;
+      touch-action: pan-y pan-x;
     }
 
     .reader.scroll {
-      overflow-y: auto;
-      touch-action: pan-y;
+      overflow: auto;
     }
 
-    /* Webtoon / continuous strip mode */
+    /* Continuous strip / webtoon-like scroll */
     .scroll-view {
       width: 100%;
       display: flex;
@@ -157,7 +157,7 @@
 
     .scroll-page img {
       display: block;
-      width: min(100%, calc(var(--strip-width) * var(--zoom)));
+      width: calc(100% * var(--zoom));
       max-width: none;
       height: auto;
       margin: 0 auto;
@@ -550,15 +550,42 @@
       fsZoomResetBtn.textContent = `${pct}%`;
     }
 
-    function setZoom(nextZoom, userAction = true) {
-      zoomLevel = clamp(Number(nextZoom) || 1, 0.5, 3);
+    function zoomAtPoint(nextZoom, clientX, clientY, userAction = true) {
+      const oldZoom = zoomLevel;
+      const newZoom = clamp(Number(nextZoom) || 1, 0.5, 3);
+      if (Math.abs(newZoom - oldZoom) < 0.0001) return;
+
+      const rect = reader.getBoundingClientRect();
+      const x = clamp(clientX - rect.left, 0, rect.width);
+      const y = clamp(clientY - rect.top, 0, rect.height);
+      const scaleFactor = newZoom / oldZoom;
+
+      if (mode === 'scroll') {
+        const nextScrollLeft = (reader.scrollLeft + x) * scaleFactor - x;
+        const nextScrollTop = (reader.scrollTop + y) * scaleFactor - y;
+        zoomLevel = newZoom;
+        if (userAction) zoomLocked = true;
+        applyZoom();
+        reader.scrollLeft = Math.max(0, nextScrollLeft);
+        reader.scrollTop = Math.max(0, nextScrollTop);
+        updateThumbActive();
+        return;
+      }
+
+      zoomLevel = newZoom;
       if (userAction) zoomLocked = true;
       applyZoom();
       updateView();
     }
 
+    function setZoom(nextZoom, userAction = true) {
+      const rect = reader.getBoundingClientRect();
+      zoomAtPoint(nextZoom, rect.width / 2, rect.height / 2, userAction);
+    }
+
     function zoomIn() { setZoom(zoomLevel + 0.1, true); }
     function zoomOut() { setZoom(zoomLevel - 0.1, true); }
+
     function resetZoom(lockOff = true) {
       zoomLevel = 1;
       zoomLocked = !lockOff ? zoomLocked : false;
@@ -571,10 +598,12 @@
       if (zoomLocked) return;
       if (theme === 'mobile' && mode === 'scroll') {
         const portrait = document.body.classList.contains('portrait');
-        setZoom(portrait ? 1 : 0.84, false);
-      } else {
-        setZoom(1, false);
+        zoomLevel = portrait ? 1 : 0.84;
+        applyZoom();
+        return;
       }
+      zoomLevel = 1;
+      applyZoom();
     }
 
     function setTheme(t) {
@@ -797,10 +826,8 @@
 
       if (showScroll) {
         renderScroll();
-        if (!zoomLocked) autoFitZoom();
       } else {
         renderBook();
-        if (!zoomLocked) autoFitZoom();
       }
 
       updateButtons();
@@ -864,8 +891,14 @@
       document.body.classList.toggle('fullscreen-reading', !!document.fullscreenElement);
     }
 
+    function zoomFromCenter(nextZoom, userAction = true) {
+      const rect = reader.getBoundingClientRect();
+      zoomAtPoint(nextZoom, rect.width / 2, rect.height / 2, userAction);
+    }
+
     // events
     openFileBtn.addEventListener('click', () => fileInput.click());
+
     fileInput.addEventListener('change', async (e) => {
       await loadSelectedFiles(e.target.files);
       e.target.value = '';
@@ -892,12 +925,12 @@
     btnBook.addEventListener('click', () => setMode('book'));
     thumbToggleBtn.addEventListener('click', toggleThumbs);
     fsThumbBtn.addEventListener('click', toggleThumbs);
-    zoomOutBtn.addEventListener('click', zoomOut);
+    zoomOutBtn.addEventListener('click', () => zoomFromCenter(zoomLevel - 0.1, true));
     zoomResetBtn.addEventListener('click', () => { zoomLocked = false; resetZoom(true); });
-    zoomInBtn.addEventListener('click', zoomIn);
-    fsZoomOutBtn.addEventListener('click', zoomOut);
+    zoomInBtn.addEventListener('click', () => zoomFromCenter(zoomLevel + 0.1, true));
+    fsZoomOutBtn.addEventListener('click', () => zoomFromCenter(zoomLevel - 0.1, true));
     fsZoomResetBtn.addEventListener('click', () => { zoomLocked = false; resetZoom(true); });
-    fsZoomInBtn.addEventListener('click', zoomIn);
+    fsZoomInBtn.addEventListener('click', () => zoomFromCenter(zoomLevel + 0.1, true));
     fullscreenBtn.addEventListener('click', toggleFullscreen);
     fsExitBtn.addEventListener('click', toggleFullscreen);
 
@@ -915,8 +948,8 @@
       if (e.key === 'Home') firstPage();
       if (e.key === 'End') lastPage();
       if (e.key.toLowerCase() === 'f') toggleFullscreen();
-      if (e.key === '+' || e.key === '=') zoomIn();
-      if (e.key === '-' || e.key === '_') zoomOut();
+      if (e.key === '+' || e.key === '=') zoomFromCenter(zoomLevel + 0.1, true);
+      if (e.key === '-' || e.key === '_') zoomFromCenter(zoomLevel - 0.1, true);
       if (e.key === '0') { zoomLocked = false; resetZoom(true); }
     });
 
@@ -965,7 +998,9 @@
       if (!pinchStartDistance) return;
       const ratio = distance / pinchStartDistance;
       zoomLocked = true;
-      setZoom(pinchStartZoom * ratio, true);
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      zoomAtPoint(pinchStartZoom * ratio, midX, midY, true);
     }, { passive: false });
 
     reader.addEventListener('touchend', (e) => {
@@ -1003,7 +1038,7 @@
       e.preventDefault();
       zoomLocked = true;
       const delta = e.deltaY > 0 ? -0.08 : 0.08;
-      setZoom(zoomLevel + delta, true);
+      zoomFromCenter(zoomLevel + delta, true);
     }, { passive: false });
 
     // init
