@@ -4,9 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>CBZ Reader Local</title>
-
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
   <style>
     :root {
       --bg: #0f1115;
@@ -21,6 +19,7 @@
       --thumb-w: 112px;
       --topbar-h: 62px;
       --zoom: 1;
+      --strip-width: 100%;
     }
 
     * { box-sizing: border-box; }
@@ -38,7 +37,6 @@
 
     body.mobile { --reader-bg: #0b0d12; }
     body.pc { --reader-bg: #131722; }
-
     body.portrait { --layout-mode: portrait; }
     body.landscape { --layout-mode: landscape; }
 
@@ -137,32 +135,40 @@
       touch-action: pan-y;
     }
 
+    /* Webtoon / continuous strip mode */
     .scroll-view {
       width: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 16px 0 32px;
-      gap: 16px;
+      gap: 0;
+      padding: 0;
+      margin: 0;
     }
 
     .scroll-page {
-      max-width: min(100%, 1100px);
       width: 100%;
-      display: flex;
-      justify-content: center;
+      display: block;
+      line-height: 0;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
     }
 
     .scroll-page img {
-      max-width: 100%;
-      height: auto;
       display: block;
+      width: min(100%, calc(var(--strip-width) * var(--zoom)));
+      max-width: none;
+      height: auto;
+      margin: 0 auto;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
       background: #fff;
-      box-shadow: 0 8px 30px var(--shadow);
-      border-radius: 10px;
-      transform: scale(var(--zoom));
-      transform-origin: top center;
-      will-change: transform;
+      transform: none;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-drag: none;
     }
 
     .book-shell {
@@ -208,9 +214,6 @@
       object-fit: contain;
       display: block;
       background: #fff;
-      transform: scale(var(--zoom));
-      transform-origin: center center;
-      will-change: transform;
     }
 
     .single-page {
@@ -226,9 +229,6 @@
       background: #fff;
       box-shadow: 0 12px 40px var(--shadow);
       border-radius: 12px;
-      transform: scale(var(--zoom));
-      transform-origin: center center;
-      will-change: transform;
     }
 
     .nav-bottom {
@@ -508,25 +508,11 @@
     if (thumbsOpen === null) thumbsOpen = (theme === 'pc') ? '1' : '0';
     thumbsOpen = thumbsOpen === '1';
 
-    function setStatus(msg) {
-      statusEl.textContent = msg;
-    }
-
-    function isImageFile(name) {
-      return /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(name);
-    }
-
-    function isZipFile(name) {
-      return /\.(cbz|zip)$/i.test(name);
-    }
-
-    function naturalSort(a, b) {
-      return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-    }
-
-    function clamp(n, min, max) {
-      return Math.max(min, Math.min(max, n));
-    }
+    function setStatus(msg) { statusEl.textContent = msg; }
+    function isImageFile(name) { return /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(name); }
+    function isZipFile(name) { return /\.(cbz|zip)$/i.test(name); }
+    function naturalSort(a, b) { return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }); }
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 
     function updateOrientationState() {
       const portrait = window.matchMedia('(orientation: portrait)').matches || window.innerHeight >= window.innerWidth;
@@ -538,9 +524,7 @@
       return mode === 'book' && (theme === 'pc' || document.body.classList.contains('landscape'));
     }
 
-    function getBookStep() {
-      return isSpreadView() ? 2 : 1;
-    }
+    function getBookStep() { return isSpreadView() ? 2 : 1; }
 
     function getMaxStartIndex() {
       if (!pages.length) return 0;
@@ -573,14 +557,8 @@
       updateView();
     }
 
-    function zoomIn() {
-      setZoom(zoomLevel + 0.1, true);
-    }
-
-    function zoomOut() {
-      setZoom(zoomLevel - 0.1, true);
-    }
-
+    function zoomIn() { setZoom(zoomLevel + 0.1, true); }
+    function zoomOut() { setZoom(zoomLevel - 0.1, true); }
     function resetZoom(lockOff = true) {
       zoomLevel = 1;
       zoomLocked = !lockOff ? zoomLocked : false;
@@ -606,7 +584,6 @@
       document.body.classList.toggle('pc', t === 'pc');
       btnMobile.classList.toggle('active', t === 'mobile');
       btnPc.classList.toggle('active', t === 'pc');
-
       if (theme === 'pc') setThumbsOpen(true);
       if (!zoomLocked) autoFitZoom();
       updateView();
@@ -630,9 +607,7 @@
       fsThumbBtn.classList.toggle('active', thumbsOpen);
     }
 
-    function toggleThumbs() {
-      setThumbsOpen(!thumbsOpen);
-    }
+    function toggleThumbs() { setThumbsOpen(!thumbsOpen); }
 
     function clearPages() {
       for (const p of pages) {
@@ -658,18 +633,15 @@
     async function loadImageFiles(fileList) {
       clearPages();
       setStatus('กำลังอ่านรูปภาพ...');
-
       const files = [...fileList].filter(f => isImageFile(f.name)).sort((a, b) => naturalSort(a.name, b.name));
       if (!files.length) {
         setStatus('ไม่พบรูปภาพ');
         return;
       }
-
       for (const file of files) {
         const url = URL.createObjectURL(file);
         pages.push({ name: file.name, url });
       }
-
       currentIndex = 0;
       setStatus(`โหลดแล้ว ${pages.length} หน้า`);
       renderThumbs();
@@ -681,32 +653,23 @@
         alert('JSZip โหลดไม่สำเร็จ');
         return;
       }
-
       clearPages();
       setStatus('กำลังอ่านไฟล์...');
-
       const zip = await JSZip.loadAsync(file);
       const entries = [];
-
       zip.forEach((relativePath, zipEntry) => {
-        if (!zipEntry.dir && isImageFile(zipEntry.name)) {
-          entries.push(zipEntry.name);
-        }
+        if (!zipEntry.dir && isImageFile(zipEntry.name)) entries.push(zipEntry.name);
       });
-
       entries.sort(naturalSort);
-
       if (!entries.length) {
         setStatus('ไม่พบรูปในไฟล์ CBZ');
         return;
       }
-
       for (const name of entries) {
         const blob = await zip.file(name).async('blob');
         const url = URL.createObjectURL(blob);
         pages.push({ name, url });
       }
-
       currentIndex = 0;
       setStatus(`โหลดแล้ว ${pages.length} หน้า`);
       renderThumbs();
@@ -716,7 +679,6 @@
     async function loadSelectedFiles(fileList) {
       const files = [...fileList];
       if (!files.length) return;
-
       const first = files[0];
       try {
         if (files.length > 1 || isImageFile(first.name)) {
@@ -736,12 +698,10 @@
     function updateButtons() {
       const has = pages.length > 0;
       const lastStart = getMaxStartIndex();
-
       prevBtn.disabled = !has || currentIndex <= 0;
       firstBtn.disabled = !has || currentIndex <= 0;
       nextBtn.disabled = !has || currentIndex >= lastStart;
       lastBtn.disabled = !has || currentIndex >= lastStart;
-
       bookPrev.disabled = !has || currentIndex <= 0;
       bookNext.disabled = !has || currentIndex >= lastStart;
     }
@@ -752,13 +712,11 @@
         for (let i = 0; i < pages.length; i++) {
           const wrap = document.createElement('div');
           wrap.className = 'scroll-page';
-
           const img = document.createElement('img');
           img.loading = 'lazy';
           img.decoding = 'async';
           img.src = pages[i].url;
           img.alt = pages[i].name;
-
           wrap.appendChild(img);
           scrollView.appendChild(wrap);
         }
@@ -770,62 +728,46 @@
         thumbPanel.innerHTML = '';
         return;
       }
-
       if (thumbPanel.childElementCount !== pages.length) {
         thumbPanel.innerHTML = '';
-
         pages.forEach((page, index) => {
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'thumb-item';
           btn.dataset.index = String(index);
-
           const img = document.createElement('img');
           img.loading = 'lazy';
           img.decoding = 'async';
           img.src = page.url;
           img.alt = page.name;
-
           btn.appendChild(img);
-
           btn.addEventListener('click', () => {
             currentIndex = index;
             updateView();
             syncScrollToCurrent();
           });
-
           thumbPanel.appendChild(btn);
         });
       }
-
       updateThumbActive();
     }
 
     function updateThumbActive() {
       const items = thumbPanel.querySelectorAll('.thumb-item');
-      items.forEach((el, i) => {
-        el.classList.toggle('active', i === currentIndex);
-      });
+      items.forEach((el, i) => el.classList.toggle('active', i === currentIndex));
     }
 
     function renderBook() {
       const total = pages.length;
       if (!total) return;
-
       if (isSpreadView()) {
         normalizeSpreadIndex();
-
         const leftIndex = currentIndex;
         const rightIndex = currentIndex + 1;
         const rightExists = rightIndex < total;
-
-        pageCounter.textContent = rightExists
-          ? `${leftIndex + 1}-${rightIndex + 1} / ${total}`
-          : `${leftIndex + 1} / ${total}`;
-
+        pageCounter.textContent = rightExists ? `${leftIndex + 1}-${rightIndex + 1} / ${total}` : `${leftIndex + 1} / ${total}`;
         leftPage.src = pages[leftIndex]?.url || '';
         leftPage.alt = pages[leftIndex]?.name || '';
-
         rightPage.src = rightExists ? (pages[rightIndex]?.url || '') : '';
         rightPage.alt = rightExists ? (pages[rightIndex]?.name || '') : '';
         rightPage.parentElement.style.visibility = rightExists ? 'visible' : 'hidden';
@@ -848,7 +790,6 @@
       }
 
       dropzone.classList.add('hidden');
-
       const showScroll = mode === 'scroll';
       reader.classList.toggle('scroll', showScroll);
       scrollView.classList.toggle('hidden', !showScroll);
@@ -856,8 +797,10 @@
 
       if (showScroll) {
         renderScroll();
+        if (!zoomLocked) autoFitZoom();
       } else {
         renderBook();
+        if (!zoomLocked) autoFitZoom();
       }
 
       updateButtons();
@@ -866,11 +809,9 @@
 
     function nextPage() {
       if (!pages.length || busy) return;
-
       const step = mode === 'book' ? getBookStep() : 1;
       const maxStart = getMaxStartIndex();
       if (currentIndex >= maxStart) return;
-
       currentIndex = Math.min(currentIndex + step, maxStart);
       updateView();
       syncScrollToCurrent();
@@ -878,10 +819,8 @@
 
     function prevPage() {
       if (!pages.length || busy) return;
-
       const step = mode === 'book' ? getBookStep() : 1;
       if (currentIndex <= 0) return;
-
       currentIndex = Math.max(0, currentIndex - step);
       if (isSpreadView()) normalizeSpreadIndex();
       updateView();
@@ -925,9 +864,8 @@
       document.body.classList.toggle('fullscreen-reading', !!document.fullscreenElement);
     }
 
-    // Events
+    // events
     openFileBtn.addEventListener('click', () => fileInput.click());
-
     fileInput.addEventListener('change', async (e) => {
       await loadSelectedFiles(e.target.files);
       e.target.value = '';
@@ -952,18 +890,14 @@
     btnPc.addEventListener('click', () => setTheme('pc'));
     btnScroll.addEventListener('click', () => setMode('scroll'));
     btnBook.addEventListener('click', () => setMode('book'));
-
     thumbToggleBtn.addEventListener('click', toggleThumbs);
     fsThumbBtn.addEventListener('click', toggleThumbs);
-
     zoomOutBtn.addEventListener('click', zoomOut);
     zoomResetBtn.addEventListener('click', () => { zoomLocked = false; resetZoom(true); });
     zoomInBtn.addEventListener('click', zoomIn);
-
     fsZoomOutBtn.addEventListener('click', zoomOut);
     fsZoomResetBtn.addEventListener('click', () => { zoomLocked = false; resetZoom(true); });
     fsZoomInBtn.addEventListener('click', zoomIn);
-
     fullscreenBtn.addEventListener('click', toggleFullscreen);
     fsExitBtn.addEventListener('click', toggleFullscreen);
 
@@ -971,7 +905,6 @@
     nextBtn.addEventListener('click', nextPage);
     firstBtn.addEventListener('click', firstPage);
     lastBtn.addEventListener('click', lastPage);
-
     bookPrev.addEventListener('click', prevPage);
     bookNext.addEventListener('click', nextPage);
 
@@ -999,7 +932,7 @@
       }
     });
 
-    // Swipe on mobile, only in book mode
+    // Swipe and pinch
     let touchStartX = 0;
     let touchStartY = 0;
     let tapLastTime = 0;
@@ -1009,7 +942,6 @@
 
     reader.addEventListener('touchstart', (e) => {
       if (!pages.length) return;
-
       if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -1018,7 +950,6 @@
         pinchActive = true;
         return;
       }
-
       const t = e.changedTouches[0];
       if (!t) return;
       touchStartX = t.clientX;
@@ -1028,11 +959,9 @@
     reader.addEventListener('touchmove', (e) => {
       if (!pinchActive || e.touches.length !== 2) return;
       e.preventDefault();
-
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const distance = Math.hypot(dx, dy);
-
       if (!pinchStartDistance) return;
       const ratio = distance / pinchStartDistance;
       zoomLocked = true;
@@ -1041,26 +970,21 @@
 
     reader.addEventListener('touchend', (e) => {
       if (!pages.length) return;
-
       if (e.touches && e.touches.length >= 2) return;
       if (pinchActive) {
         pinchActive = false;
         return;
       }
-
       const now = Date.now();
       const t = e.changedTouches[0];
       if (!t) return;
-
       const dx = t.clientX - touchStartX;
       const dy = t.clientY - touchStartY;
-
       if (Math.abs(dx) > 50 && Math.abs(dy) < 35 && mode === 'book') {
         if (dx < 0) nextPage();
         else prevPage();
         return;
       }
-
       if (now - tapLastTime < 280) {
         if (Math.abs(zoomLevel - 1) > 0.001) {
           zoomLocked = false;
@@ -1088,17 +1012,14 @@
     setTheme(theme);
     setMode(mode);
     setThumbsOpen(thumbsOpen);
-
     if (!zoomLocked) autoFitZoom();
     else applyZoom();
-
     updateView();
 
     window.addEventListener('resize', () => {
       const before = document.body.classList.contains('portrait');
       updateOrientationState();
       const after = document.body.classList.contains('portrait');
-
       if (!zoomLocked) autoFitZoom();
       if (before !== after) updateView();
     });
