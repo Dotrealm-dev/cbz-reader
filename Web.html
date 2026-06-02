@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CBZ Reader Local</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --text: #e8eaf0;
+      --muted: #9aa3b2;
+      --accent: #5aa9ff;
+      --border: #2a3140;
+      --shadow: rgba(0,0,0,.35);
+      --reader-bg: #111318;
+      --page-bg: #ffffff;
+    }
+    body.mobile { --reader-bg: #0b0d12; }
+    body.pc { --reader-bg: #131722; }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+    }
+
+    .topbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 10px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px var(--shadow);
+      z-index: 10;
+    }
+
+    .group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button, input[type="file"] {
+      background: #202635;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    button { cursor: pointer; }
+    button.active {
+      background: var(--accent);
+      color: #05101c;
+      border-color: transparent;
+      font-weight: 700;
+    }
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+      margin-left: auto;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 45vw;
+    }
+
+    .dropzone {
+      margin: 10px;
+      padding: 16px;
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      background: rgba(255,255,255,.02);
+      color: var(--muted);
+      text-align: center;
+      user-select: none;
+    }
+    .dropzone.dragover {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(90,169,255,.08);
+    }
+
+    .reader {
+      flex: 1;
+      overflow: hidden;
+      background: var(--reader-bg);
+      position: relative;
+    }
+    .reader.scroll { overflow-y: auto; }
+
+    .scroll-view {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 0 32px;
+      gap: 16px;
+    }
+    .scroll-page {
+      max-width: min(100%, 1100px);
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+    .scroll-page img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      background: #fff;
+      box-shadow: 0 8px 30px var(--shadow);
+    }
+
+    .book-shell {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+    }
+
+    .book {
+      position: relative;
+      width: min(92vw, 1200px);
+      height: min(88vh, 900px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .spread {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .page {
+      position: relative;
+      background: var(--page-bg);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 12px 40px var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .page img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: #fff;
+    }
+
+    .single-page {
+      width: 100%;
+      height: 100%;
+      display: none;
+    }
+    .single-page img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #fff;
+      box-shadow: 0 12px 40px var(--shadow);
+      border-radius: 12px;
+    }
+
+    .nav-bottom {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 12px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .nav-bottom .navbtn {
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+    }
+
+    .page-counter {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(0,0,0,.55);
+      color: white;
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .hidden { display: none !important; }
+
+    body.mobile .book { width: min(100vw, 100%); height: calc(100vh - 72px); }
+    body.mobile .spread { display: none; }
+    body.mobile .single-page { display: block; }
+    body.mobile .book-shell { padding: 0; }
+    body.mobile .nav-bottom { bottom: 16px; }
+
+    @media (max-width: 900px) {
+      .status {
+        max-width: 100%;
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+
+<body class="mobile">
+  <div class="app">
+    <div class="topbar">
+      <div class="group">
+        <input id="fileInput" type="file" accept=".cbz,.zip,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif" multiple />
+        <button id="btnMobile" class="active">Mobile</button>
+        <button id="btnPc">PC</button>
+        <button id="btnScroll" class="active">Scroll</button>
+        <button id="btnBook">Book</button>
+      </div>
+
+      <div class="group">
+        <button id="prevBtn" disabled>Prev</button>
+        <button id="nextBtn" disabled>Next</button>
+        <button id="firstBtn" disabled>First</button>
+        <button id="lastBtn" disabled>Last</button>
+      </div>
+
+      <div class="status" id="status">เลือกไฟล์ CBZ/ZIP หรือรูปภาพ</div>
+    </div>
+
+    <div id="dropzone" class="dropzone">ลากไฟล์ .cbz, .zip หรือรูปภาพมาวางตรงนี้</div>
+
+    <div id="reader" class="reader scroll">
+      <div id="scrollView" class="scroll-view hidden"></div>
+
+      <div id="bookShell" class="book-shell hidden">
+        <div class="book">
+          <div class="page-counter" id="pageCounter">0 / 0</div>
+
+          <div class="spread">
+            <div class="page"><img id="leftPage" alt="left page"></div>
+            <div class="page"><img id="rightPage" alt="right page"></div>
+          </div>
+
+          <div class="single-page">
+            <img id="singlePage" alt="single page">
+          </div>
+
+          <div class="nav-bottom">
+            <button class="navbtn" id="bookPrev">◀</button>
+            <button class="navbtn" id="bookNext">▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const reader = document.getElementById('reader');
+    const scrollView = document.getElementById('scrollView');
+    const bookShell = document.getElementById('bookShell');
+    const statusEl = document.getElementById('status');
+    const btnMobile = document.getElementById('btnMobile');
+    const btnPc = document.getElementById('btnPc');
+    const btnScroll = document.getElementById('btnScroll');
+    const btnBook = document.getElementById('btnBook');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const firstBtn = document.getElementById('firstBtn');
+    const lastBtn = document.getElementById('lastBtn');
+    const bookPrev = document.getElementById('bookPrev');
+    const bookNext = document.getElementById('bookNext');
+    const leftPage = document.getElementById('leftPage');
+    const rightPage = document.getElementById('rightPage');
+    const singlePage = document.getElementById('singlePage');
+    const pageCounter = document.getElementById('pageCounter');
+
+    let pages = [];
+    let currentIndex = 0;
+    let theme = localStorage.getItem('cbz_theme') || 'mobile';
+    let mode = localStorage.getItem('cbz_mode') || 'scroll';
+
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+    }
+
+    function setTheme(t) {
+      theme = t;
+      localStorage.setItem('cbz_theme', t);
+      document.body.classList.toggle('mobile', t === 'mobile');
+      document.body.classList.toggle('pc', t === 'pc');
+      btnMobile.classList.toggle('active', t === 'mobile');
+      btnPc.classList.toggle('active', t === 'pc');
+      updateView();
+    }
+
+    function setMode(m) {
+      mode = m;
+      localStorage.setItem('cbz_mode', m);
+      btnScroll.classList.toggle('active', m === 'scroll');
+      btnBook.classList.toggle('active', m === 'book');
+      updateView();
+    }
+
+    function naturalSort(a, b) {
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    }
+
+    function isImageFile(name) {
+      return /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(name);
+    }
+
+    function isZipFile(name) {
+      return /\.(cbz|zip)$/i.test(name);
+    }
+
+    function mimeFromName(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      return ({
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        webp: 'image/webp',
+        gif: 'image/gif',
+        bmp: 'image/bmp',
+        avif: 'image/avif'
+      })[ext] || 'application/octet-stream';
+    }
+
+    function clearPages() {
+      for (const p of pages) {
+        try { URL.revokeObjectURL(p.url); } catch {}
+      }
+      pages = [];
+      currentIndex = 0;
+      scrollView.innerHTML = '';
+      leftPage.src = '';
+      rightPage.src = '';
+      singlePage.src = '';
+      pageCounter.textContent = '0 / 0';
+      prevBtn.disabled = true;
+      nextBtn.disabled = true;
+      firstBtn.disabled = true;
+      lastBtn.disabled = true;
+      bookPrev.disabled = true;
+      bookNext.disabled = true;
+    }
+
+    async function loadImageFiles(fileList) {
+      clearPages();
+      setStatus('กำลังอ่านรูปภาพ...');
+      const files = [...fileList].filter(f => isImageFile(f.name)).sort((a, b) => naturalSort(a.name, b.name));
+      if (!files.length) {
+        setStatus('ไม่พบรูปภาพ');
+        return;
+      }
+
+      for (const file of files) {
+        const url = URL.createObjectURL(file);
+        pages.push({ name: file.name, url });
+      }
+
+      currentIndex = 0;
+      setStatus(`โหลดแล้ว ${pages.length} หน้า`);
+      updateView();
+    }
+
+    function findEOCD(dv) {
+      const sig = 0x06054b50;
+      const min = Math.max(0, dv.byteLength - 0x10000 - 22);
+      for (let i = dv.byteLength - 22; i >= min; i--) {
+        if (dv.getUint32(i, true) === sig) return i;
+      }
+      return -1;
+    }
+
+    function decodeBytes(bytes) {
+      try {
+        return new TextDecoder('utf-8').decode(bytes);
+      } catch {
+        let s = '';
+        for (const b of bytes) s += String.fromCharCode(b);
+        return s;
+      }
+    }
+
+    async function inflateRaw(uint8) {
+      if (!('DecompressionStream' in window)) {
+        throw new Error('อุปกรณ์นี้ไม่รองรับการแตก ZIP แบบ deflate');
+      }
+      const ds = new DecompressionStream('deflate-raw');
+      const out = new Blob([uint8]).stream().pipeThrough(ds);
+      const ab = await new Response(out).arrayBuffer();
+      return new Uint8Array(ab);
+    }
+
+    async function parseZipFile(file) {
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      const dv = new DataView(buf);
+
+      const eocd = findEOCD(dv);
+      if (eocd < 0) throw new Error('หา ZIP footer ไม่เจอ');
+
+      const totalEntries = dv.getUint16(eocd + 10, true);
+      const cdOffset = dv.getUint32(eocd + 16, true);
+
+      const entries = [];
+      let p = cdOffset;
+
+      for (let i = 0; i < totalEntries; i++) {
+        if (dv.getUint32(p, true) !== 0x02014b50) {
+          throw new Error('ZIP โครงสร้างผิดปกติ');
+        }
+
+        const method = dv.getUint16(p + 10, true);
+        const compSize = dv.getUint32(p + 20, true);
+        const nameLen = dv.getUint16(p + 28, true);
+        const extraLen = dv.getUint16(p + 30, true);
+        const commentLen = dv.getUint16(p + 32, true);
+        const localOffset = dv.getUint32(p + 42, true);
+
+        const nameBytes = bytes.slice(p + 46, p + 46 + nameLen);
+        const name = decodeBytes(nameBytes);
+
+        entries.push({ name, method, compSize, localOffset });
+
+        p += 46 + nameLen + extraLen + commentLen;
+      }
+
+      const imageEntries = entries.filter(e => isImageFile(e.name)).sort((a, b) => naturalSort(a.name, b.name));
+      if (!imageEntries.length) throw new Error('ไม่พบรูปภาพใน ZIP');
+
+      clearPages();
+      setStatus('กำลังแตกไฟล์...');
+
+      for (const entry of imageEntries) {
+        if (dv.getUint32(entry.localOffset, true) !== 0x04034b50) {
+          throw new Error('อ่านไฟล์ย่อยไม่สำเร็จ');
+        }
+
+        const nameLen = dv.getUint16(entry.localOffset + 26, true);
+        const extraLen = dv.getUint16(entry.localOffset + 28, true);
+        const dataOffset = entry.localOffset + 30 + nameLen + extraLen;
+        const comp = bytes.slice(dataOffset, dataOffset + entry.compSize);
+
+        let raw;
+        if (entry.method === 0) {
+          raw = comp;
+        } else if (entry.method === 8) {
+          raw = await inflateRaw(comp);
+        } else {
+          throw new Error(`ZIP method ${entry.method} ยังไม่รองรับ`);
+        }
+
+        const blob = new Blob([raw], { type: mimeFromName(entry.name) });
+        const url = URL.createObjectURL(blob);
+        pages.push({ name: entry.name, url });
+      }
+
+      currentIndex = 0;
+      setStatus(`โหลดแล้ว ${pages.length} หน้า`);
+      updateView();
+    }
+
+    async function loadSelectedFiles(fileList) {
+      const files = [...fileList];
+      if (!files.length) return;
+
+      const first = files[0];
+      try {
+        if (files.length > 1 || isImageFile(first.name)) {
+          await loadImageFiles(files);
+        } else if (isZipFile(first.name)) {
+          await parseZipFile(first);
+        } else {
+          setStatus('รองรับ .cbz, .zip และไฟล์รูปภาพ');
+        }
+      } catch (err) {
+        console.error(err);
+        clearPages();
+        setStatus('เปิดไฟล์ไม่สำเร็จ: ' + (err?.message || err));
+      }
+    }
+
+    function updateButtons() {
+      const has = pages.length > 0;
+      prevBtn.disabled = !has || currentIndex <= 0;
+      firstBtn.disabled = !has || currentIndex <= 0;
+      nextBtn.disabled = !has || currentIndex >= pages.length - 1;
+      lastBtn.disabled = !has || currentIndex >= pages.length - 1;
+      bookPrev.disabled = !has || currentIndex <= 0;
+      bookNext.disabled = !has || currentIndex >= pages.length - 1;
+    }
+
+    function renderScroll() {
+      if (scrollView.childElementCount !== pages.length) {
+        scrollView.innerHTML = '';
+        for (let i = 0; i < pages.length; i++) {
+          const wrap = document.createElement('div');
+          wrap.className = 'scroll-page';
+          const img = document.createElement('img');
+          img.loading = 'lazy';
+          img.src = pages[i].url;
+          img.alt = pages[i].name;
+          wrap.appendChild(img);
+          scrollView.appendChild(wrap);
+        }
+      }
+    }
+
+    function renderBook() {
+      pageCounter.textContent = `${currentIndex + 1} / ${pages.length}`;
+
+      if (theme === 'mobile') {
+        singlePage.src = pages[currentIndex]?.url || '';
+        singlePage.alt = pages[currentIndex]?.name || '';
+      } else {
+        const leftIndex = currentIndex;
+        const rightIndex = currentIndex + 1;
+
+        leftPage.src = pages[leftIndex]?.url || '';
+        leftPage.alt = pages[leftIndex]?.name || '';
+
+        rightPage.src = pages[rightIndex]?.url || '';
+        rightPage.alt = pages[rightIndex]?.name || '';
+        rightPage.parentElement.style.visibility = (rightIndex < pages.length) ? 'visible' : 'hidden';
+      }
+    }
+
+    function updateView() {
+      const hasImages = pages.length > 0;
+      const showScroll = mode === 'scroll';
+
+      reader.classList.toggle('scroll', showScroll);
+      scrollView.classList.toggle('hidden', !showScroll);
+      bookShell.classList.toggle('hidden', showScroll);
+
+      updateButtons();
+      if (!hasImages) return;
+
+      if (showScroll) renderScroll();
+      else renderBook();
+    }
+
+    function nextPage() {
+      if (currentIndex >= pages.length - 1) return;
+      currentIndex++;
+      updateView();
+      syncScrollToCurrent();
+    }
+
+    function prevPage() {
+      if (currentIndex <= 0) return;
+      currentIndex--;
+      updateView();
+      syncScrollToCurrent();
+    }
+
+    function firstPage() {
+      currentIndex = 0;
+      updateView();
+      syncScrollToCurrent();
+    }
+
+    function lastPage() {
+      currentIndex = pages.length - 1;
+      updateView();
+      syncScrollToCurrent();
+    }
+
+    function syncScrollToCurrent() {
+      if (mode !== 'scroll') return;
+      const target = scrollView.children[currentIndex];
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    fileInput.addEventListener('change', async (e) => {
+      await loadSelectedFiles(e.target.files);
+      e.target.value = '';
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      await loadSelectedFiles(e.dataTransfer.files);
+    });
+
+    btnMobile.addEventListener('click', () => setTheme('mobile'));
+    btnPc.addEventListener('click', () => setTheme('pc'));
+    btnScroll.addEventListener('click', () => setMode('scroll'));
+    btnBook.addEventListener('click', () => setMode('book'));
+
+    nextBtn.addEventListener('click', nextPage);
+    prevBtn.addEventListener('click', prevPage);
+    firstBtn.addEventListener('click', firstPage);
+    lastBtn.addEventListener('click', lastPage);
+    bookNext.addEventListener('click', nextPage);
+    bookPrev.addEventListener('click', prevPage);
+
+    window.addEventListener('keydown', (e) => {
+      if (!pages.length) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') nextPage();
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') prevPage();
+      if (e.key === 'Home') firstPage();
+      if (e.key === 'End') lastPage();
+    });
+
+    setTheme(theme);
+    setMode(mode);
+    updateView();
+  </script>
+</body>
+</html>
