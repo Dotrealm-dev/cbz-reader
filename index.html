@@ -131,14 +131,7 @@
       position: relative;
       touch-action: pan-y pan-x;
       /* FIX: ป้องกัน bounce effect บน iOS ที่ทำให้ zoom กระตุก */
-      .scroll-view {
-          transform-origin: top center;
-        }
-        
-      .reader {
-          overscroll-behavior: none;
-          -webkit-overflow-scrolling: auto;
-        }
+      overscroll-behavior: contain;
     }
 
     .reader.scroll {
