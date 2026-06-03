@@ -608,6 +608,9 @@
       };
     }
 
+    // ── แก้ไขหลัก: anchor-center zoom ──────────────────────────────────────
+    // หา content-point ที่อยู่กลาง viewport ก่อน zoom
+    // หลัง zoom ให้ scroll เพื่อให้จุดนั้นยังอยู่กลาง viewport เหมือนเดิม
     function setPageZoom(nextZoom) {
       const oldZoom = pageZoom;
       const newZoom = clamp(Number(nextZoom) || 1, 0.25, 2.5);
@@ -616,6 +619,10 @@
       const before = getReaderScrollSize();
       const ratio = newZoom / oldZoom;
 
+      // จุดกึ่งกลาง viewport ใน content-coordinates ก่อน zoom
+      const anchorY = before.top + before.clientHeight / 2;
+      const anchorX = before.left + before.clientWidth / 2;
+
       pageZoom = newZoom;
       applyPageZoom();
 
@@ -623,15 +630,17 @@
       zoomRestoreRaf = requestAnimationFrame(() => {
         const after = getReaderScrollSize();
 
-        const targetTop = Math.max(0, before.top * ratio);
-        const targetLeft = Math.max(0, before.left * ratio);
+        // หลัง zoom จุดเดิมอยู่ที่ anchorY*ratio ให้ scroll ให้มันกลับมาตรงกลาง
+        const targetTop = anchorY * ratio - after.clientHeight / 2;
+        const targetLeft = anchorX * ratio - after.clientWidth / 2;
 
-        reader.scrollTop = Math.min(targetTop, Math.max(0, after.height - after.clientHeight));
-        reader.scrollLeft = Math.min(targetLeft, Math.max(0, after.width - after.clientWidth));
+        reader.scrollTop  = Math.min(Math.max(0, targetTop),  Math.max(0, after.height - after.clientHeight));
+        reader.scrollLeft = Math.min(Math.max(0, targetLeft), Math.max(0, after.width  - after.clientWidth));
 
         zoomRestoreRaf = 0;
       });
     }
+    // ────────────────────────────────────────────────────────────────────────
 
     function zoomIn() {
       setPageZoom(pageZoom + 0.1);
