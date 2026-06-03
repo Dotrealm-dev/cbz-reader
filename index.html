@@ -659,6 +659,8 @@
       bookPrev.disabled = true;
       bookNext.disabled = true;
       dropzone.classList.remove('hidden');
+      pageZoom = 1;
+      applyPageZoom();
     }
 
     async function loadImageFiles(fileList) {
@@ -823,11 +825,8 @@
       scrollView.classList.toggle('hidden', !showScroll);
       bookShell.classList.toggle('hidden', showScroll);
 
-      if (showScroll) {
-        renderScroll();
-      } else {
-        renderBook();
-      }
+      if (showScroll) renderScroll();
+      else renderBook();
 
       updateButtons();
       updateThumbActive();
@@ -954,7 +953,6 @@
 
     document.addEventListener('fullscreenchange', onFullscreenChanged);
 
-    // Simple swipe navigation for book mode only; no custom pinch zoom.
     let touchStartX = 0;
     let touchStartY = 0;
 
