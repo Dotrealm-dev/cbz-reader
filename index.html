@@ -143,10 +143,6 @@
       touch-action: auto;
     }
 
-    .reader.scroll {
-      overflow: auto;
-    }
-
     .scroll-view {
       width: 100%;
       display: flex;
@@ -481,16 +477,16 @@
         </div>
       </div>
     </div>
-  </div>
 
-  <div id="thumbPanel" class="thumb-panel hidden"></div>
+    <div id="thumbPanel" class="thumb-panel hidden"></div>
 
-  <div class="fullscreen-tools">
-    <button id="fsThumbBtn">Thumbs</button>
-    <button id="fsZoomOutBtn">－</button>
-    <button id="fsZoomResetBtn">100%</button>
-    <button id="fsZoomInBtn">＋</button>
-    <button id="fsExitBtn">Exit</button>
+    <div class="fullscreen-tools">
+      <button id="fsThumbBtn">Thumbs</button>
+      <button id="fsZoomOutBtn">－</button>
+      <button id="fsZoomResetBtn">100%</button>
+      <button id="fsZoomInBtn">＋</button>
+      <button id="fsExitBtn">Exit</button>
+    </div>
   </div>
 
   <script>
@@ -534,6 +530,7 @@
     let thumbsOpen = localStorage.getItem('cbz_thumbs');
     let pageZoom = Number(localStorage.getItem('cbz_page_zoom') || '1');
     let busy = false;
+    let zoomRestoreRaf = 0;
 
     if (thumbsOpen === null) thumbsOpen = (theme === 'pc') ? '1' : '0';
     thumbsOpen = thumbsOpen === '1';
@@ -600,21 +597,39 @@
       fsZoomResetBtn.textContent = `${pct}%`;
     }
 
+    function getReaderScrollSize() {
+      return {
+        top: reader.scrollTop,
+        left: reader.scrollLeft,
+        height: reader.scrollHeight,
+        width: reader.scrollWidth,
+        clientHeight: reader.clientHeight,
+        clientWidth: reader.clientWidth
+      };
+    }
+
     function setPageZoom(nextZoom) {
       const oldZoom = pageZoom;
       const newZoom = clamp(Number(nextZoom) || 1, 0.25, 2.5);
       if (Math.abs(newZoom - oldZoom) < 0.0001) return;
 
-      const oldTop = reader.scrollTop;
-      const oldLeft = reader.scrollLeft;
-      const scale = newZoom / oldZoom;
+      const before = getReaderScrollSize();
+      const ratio = newZoom / oldZoom;
 
       pageZoom = newZoom;
       applyPageZoom();
 
-      requestAnimationFrame(() => {
-        reader.scrollTop = oldTop * scale;
-        reader.scrollLeft = oldLeft * scale;
+      if (zoomRestoreRaf) cancelAnimationFrame(zoomRestoreRaf);
+      zoomRestoreRaf = requestAnimationFrame(() => {
+        const after = getReaderScrollSize();
+
+        const targetTop = Math.max(0, before.top * ratio);
+        const targetLeft = Math.max(0, before.left * ratio);
+
+        reader.scrollTop = Math.min(targetTop, Math.max(0, after.height - after.clientHeight));
+        reader.scrollLeft = Math.min(targetLeft, Math.max(0, after.width - after.clientWidth));
+
+        zoomRestoreRaf = 0;
       });
     }
 
@@ -627,8 +642,7 @@
     }
 
     function resetZoom() {
-      pageZoom = 1;
-      applyPageZoom();
+      setPageZoom(1);
     }
 
     function setTheme(t) {
@@ -690,10 +704,7 @@
       clearPages();
       setStatus('กำลังอ่านรูปภาพ...');
 
-      const files = [...fileList]
-        .filter(f => isImageFile(f.name))
-        .sort((a, b) => naturalSort(a.name, b.name));
-
+      const files = [...fileList].filter(f => isImageFile(f.name)).sort((a, b) => naturalSort(a.name, b.name));
       if (!files.length) {
         setStatus('ไม่พบรูปภาพ');
         return;
@@ -879,14 +890,16 @@
       }
 
       dropzone.classList.add('hidden');
-
       const showScroll = mode === 'scroll';
       reader.classList.toggle('scroll', showScroll);
       scrollView.classList.toggle('hidden', !showScroll);
       bookShell.classList.toggle('hidden', showScroll);
 
-      if (showScroll) renderScroll();
-      else renderBook();
+      if (showScroll) {
+        renderScroll();
+      } else {
+        renderBook();
+      }
 
       updateButtons();
       updateThumbActive();
