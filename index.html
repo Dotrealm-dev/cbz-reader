@@ -38,15 +38,16 @@
 
     body.mobile { --reader-bg: #0b0d12; }
     body.pc { --reader-bg: #131722; }
-    body.portrait { --layout-mode: portrait; }
-    body.landscape { --layout-mode: landscape; }
+
+    body.portrait {}
+    body.landscape {}
 
     .app {
       display: flex;
       flex-direction: column;
-      height: 100vh;
-      height: 100dvh; /* iOS: ใช้ dynamic viewport height หลีกเลี่ยง address bar ทับ */
       width: 100%;
+      height: 100vh;
+      height: 100dvh;
       position: relative;
     }
 
@@ -80,10 +81,7 @@
       font-size: 14px;
     }
 
-    button {
-      cursor: pointer;
-      touch-action: manipulation;
-    }
+    button { cursor: pointer; touch-action: manipulation; }
 
     button.active {
       background: var(--accent);
@@ -130,21 +128,14 @@
       background: var(--reader-bg);
       position: relative;
       touch-action: pan-y pan-x;
-      /* FIX: ป้องกัน bounce effect บน iOS ที่ทำให้ zoom กระตุก */
-      overscroll-behavior: contain;
+      overscroll-behavior: none;
+      -webkit-overflow-scrolling: auto;
+      overflow-anchor: none;
     }
 
-    .reader.scroll {
-      overflow: auto;
-    }
+    .reader.scroll { overflow: auto; }
+    .reader.pinching { touch-action: none; }
 
-    /* FIX: ตอนกำลัง pinch ให้ปิด native touch gesture ทั้งหมด
-       ป้องกัน iOS native zoom แทรกกลางการ zoom ของเรา */
-    .reader.pinching {
-      touch-action: none;
-    }
-
-    /* Continuous strip / webtoon-like scroll */
     .scroll-view {
       width: 100%;
       display: flex;
@@ -153,6 +144,7 @@
       gap: 0;
       padding: 0;
       margin: 0;
+      overflow-anchor: none;
     }
 
     .scroll-page {
@@ -174,10 +166,9 @@
       border-radius: 0;
       box-shadow: none;
       background: #fff;
-      transform: none;
-      touch-action: none;
       user-select: none;
       -webkit-user-drag: none;
+      pointer-events: none;
     }
 
     .book-shell {
@@ -223,6 +214,8 @@
       object-fit: contain;
       display: block;
       background: #fff;
+      user-select: none;
+      -webkit-user-drag: none;
     }
 
     .single-page {
@@ -238,6 +231,8 @@
       background: #fff;
       box-shadow: 0 12px 40px var(--shadow);
       border-radius: 12px;
+      user-select: none;
+      -webkit-user-drag: none;
     }
 
     .nav-bottom {
@@ -278,6 +273,7 @@
       right: 0;
       width: var(--thumb-w);
       height: calc(100vh - var(--topbar-h));
+      height: calc(100dvh - var(--topbar-h));
       background: rgba(12, 14, 20, .96);
       border-left: 1px solid var(--border);
       transform: translateX(100%);
@@ -294,9 +290,7 @@
       height: 100dvh;
     }
 
-    body.thumbs-open .thumb-panel {
-      transform: translateX(0);
-    }
+    body.thumbs-open .thumb-panel { transform: translateX(0); }
 
     .thumb-item {
       width: 100%;
@@ -309,9 +303,7 @@
       line-height: 0;
     }
 
-    .thumb-item.active {
-      border-color: var(--accent);
-    }
+    .thumb-item.active { border-color: var(--accent); }
 
     .thumb-item img {
       width: 100%;
@@ -319,6 +311,8 @@
       object-fit: cover;
       aspect-ratio: 3 / 4;
       background: #fff;
+      user-select: none;
+      -webkit-user-drag: none;
     }
 
     .fullscreen-tools {
@@ -330,19 +324,13 @@
       z-index: 40;
     }
 
-    body.fullscreen-reading .fullscreen-tools {
-      display: flex;
-    }
+    body.fullscreen-reading .fullscreen-tools { display: flex; }
 
     :fullscreen .topbar,
-    body.fullscreen-reading .topbar {
-      display: none !important;
-    }
+    body.fullscreen-reading .topbar { display: none !important; }
 
     :fullscreen .dropzone,
-    body.fullscreen-reading .dropzone {
-      display: none !important;
-    }
+    body.fullscreen-reading .dropzone { display: none !important; }
 
     :fullscreen .reader,
     body.fullscreen-reading .reader {
@@ -350,7 +338,6 @@
       height: 100dvh !important;
     }
 
-    /* FIX: เมื่อ fullscreen ให้ app เต็มจอด้วย dvh */
     body.fullscreen-reading .app {
       height: 100vh;
       height: 100dvh;
@@ -367,30 +354,12 @@
       height: 100dvh;
     }
 
-    body.mobile.portrait .spread {
-      display: none;
-    }
-
-    body.mobile.portrait .single-page {
-      display: block;
-    }
-
-    body.mobile.landscape .spread {
-      display: grid;
-    }
-
-    body.mobile.landscape .single-page {
-      display: none;
-    }
-
-    body.pc .spread {
-      display: grid;
-    }
-
-    body.pc .single-page {
-      display: none;
-    }
-
+    body.mobile.portrait .spread { display: none; }
+    body.mobile.portrait .single-page { display: block; }
+    body.mobile.landscape .spread { display: grid; }
+    body.mobile.landscape .single-page { display: none; }
+    body.pc .spread { display: grid; }
+    body.pc .single-page { display: none; }
     body.pc .book {
       width: min(96vw, 1400px);
       height: min(90vh, 980px);
@@ -405,9 +374,7 @@
 
     @media (max-width: 700px) {
       :root { --thumb-w: 96px; }
-      .topbar {
-        gap: 6px;
-      }
+      .topbar { gap: 6px; }
       button, input[type="file"] {
         padding: 9px 10px;
         font-size: 13px;
@@ -523,16 +490,25 @@
     let zoomLocked = localStorage.getItem('cbz_zoom_locked') === '1';
     let busy = false;
 
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let tapLastTime = 0;
+    let pinchStartDistance = 0;
+    let pinchStartZoom = 1;
+    let pinchActive = false;
+    let suppressFullscreenTapUntil = 0;
+    let pinchStartScrollLeft = 0;
+    let pinchStartScrollTop = 0;
+    let pinchAnchorX = 0;
+    let pinchAnchorY = 0;
+    let zoomRestoreRaf = 0;
+
     if (thumbsOpen === null) thumbsOpen = (theme === 'pc') ? '1' : '0';
     thumbsOpen = thumbsOpen === '1';
 
-    // ─── FIX 1: iOS detection ──────────────────────────────────────────────────
-    // iOS ไม่รองรับ requestFullscreen() บน webpage ปกติ
-    // การเรียก API นี้ทำให้ iOS คิดว่ากำลัง interact กับ form แล้วแสดง dialog เด้งออก
     function isIOS() {
       return (
         /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        // iPad บน iOS 13+ แสดงตัวเป็น Mac จึงเช็ค maxTouchPoints เพิ่มเติม
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
       );
     }
@@ -579,92 +555,84 @@
       fsZoomResetBtn.textContent = `${pct}%`;
     }
 
-    // ─── FIX 2: Zoom shake ─────────────────────────────────────────────────────
-    // ปัญหาเดิม: applyZoom() เปลี่ยนขนาด CSS var ทำให้ layout reflow
-    // แต่เรา set scrollLeft/scrollTop ก่อน browser จะ reflow เสร็จ
-    // ผลคือ scroll position กระตุก/หลุดไปที่อื่น
-    // แก้: ใช้ requestAnimationFrame รอให้ browser วาด frame ใหม่ก่อน
-    // แล้วค่อย set scroll position หลัง layout อัพเดทแล้ว
-    function zoomAtPoint(nextZoom, clientX, clientY, userAction = true) {
+    function scheduleScrollRestore(nextLeft, nextTop) {
+      if (zoomRestoreRaf) cancelAnimationFrame(zoomRestoreRaf);
+      zoomRestoreRaf = requestAnimationFrame(() => {
+        reader.scrollLeft = Math.max(0, nextLeft);
+        reader.scrollTop = Math.max(0, nextTop);
+        zoomRestoreRaf = 0;
+      });
+    }
+
+    function zoomAtCurrentPoint(nextZoom, anchorX, anchorY, userAction = true) {
       const oldZoom = zoomLevel;
       const newZoom = clamp(Number(nextZoom) || 1, 0.5, 3);
       if (Math.abs(newZoom - oldZoom) < 0.0001) return;
 
-      const rect = reader.getBoundingClientRect();
-      const x = clamp(clientX - rect.left, 0, rect.width);
-      const y = clamp(clientY - rect.top, 0, rect.height);
-      const scaleFactor = newZoom / oldZoom;
-
       if (mode === 'scroll') {
-        // คำนวณ scroll position ที่ต้องการ ก่อน apply zoom
-        // เพื่อให้ content ใต้จุดที่ zoom อยู่ที่เดิมหลัง zoom
-        const nextScrollLeft = (reader.scrollLeft + x) * scaleFactor - x;
-        const nextScrollTop  = (reader.scrollTop  + y) * scaleFactor - y;
+        const scale = newZoom / oldZoom;
+        const currentLeft = reader.scrollLeft;
+        const currentTop = reader.scrollTop;
 
         zoomLevel = newZoom;
         if (userAction) {
           zoomLocked = true;
-          lastZoomInteraction = Date.now();
           suppressFullscreenTapUntil = Date.now() + 700;
         }
-        applyZoom(); // ← CSS var เปลี่ยน → browser จะ reflow ใน frame ถัดไป
+        applyZoom();
 
-        // รอ 1 frame หลัง layout เสร็จแล้วค่อย restore scroll position
-        requestAnimationFrame(() => {
-          reader.scrollLeft = Math.max(0, nextScrollLeft);
-          reader.scrollTop  = Math.max(0, nextScrollTop);
-          updateThumbActive();
-        });
+        scheduleScrollRestore(
+          (currentLeft + anchorX) * scale - anchorX,
+          (currentTop + anchorY) * scale - anchorY
+        );
         return;
       }
 
       zoomLevel = newZoom;
       if (userAction) {
         zoomLocked = true;
-        lastZoomInteraction = Date.now();
         suppressFullscreenTapUntil = Date.now() + 700;
       }
       applyZoom();
       updateView();
     }
-    function pinchZoom(nextZoom) {
-      const oldZoom = zoomLevel;
-      const newZoom = clamp(nextZoom, 0.5, 3);
-    
-      if (Math.abs(newZoom - oldZoom) < 0.0001) return;
-    
-      const scaleFactor = newZoom / oldZoom;
-    
-      zoomLevel = newZoom;
-      applyZoom();
-    
-      requestAnimationFrame(() => {
-    
-        reader.scrollLeft =
-          (pinchStartScrollLeft + pinchStartRelX) *
-          scaleFactor -
-          pinchStartRelX;
-    
-        reader.scrollTop =
-          (pinchStartScrollTop + pinchStartRelY) *
-          scaleFactor -
-          pinchStartRelY;
-    
-      });
-    }
 
-    function setZoom(nextZoom, userAction = true) {
+    function zoomFromCenter(nextZoom, userAction = true) {
       const rect = reader.getBoundingClientRect();
-      zoomAtPoint(nextZoom, rect.width / 2, rect.height / 2, userAction);
+      zoomAtCurrentPoint(nextZoom, rect.width / 2, rect.height / 2, userAction);
     }
 
-    function zoomIn() { setZoom(zoomLevel + 0.1, true); }
-    function zoomOut() { setZoom(zoomLevel - 0.1, true); }
+    function zoomPinch(nextZoom) {
+      const oldZoom = zoomLevel;
+      const newZoom = clamp(Number(nextZoom) || 1, 0.5, 3);
+      if (Math.abs(newZoom - oldZoom) < 0.0001) return;
+
+      if (mode === 'scroll') {
+        const scale = newZoom / oldZoom;
+        zoomLevel = newZoom;
+        zoomLocked = true;
+        suppressFullscreenTapUntil = Date.now() + 700;
+        applyZoom();
+
+        if (zoomRestoreRaf) cancelAnimationFrame(zoomRestoreRaf);
+        zoomRestoreRaf = requestAnimationFrame(() => {
+          reader.scrollLeft = Math.max(0, (pinchStartScrollLeft + pinchAnchorX) * scale - pinchAnchorX);
+          reader.scrollTop = Math.max(0, (pinchStartScrollTop + pinchAnchorY) * scale - pinchAnchorY);
+          zoomRestoreRaf = 0;
+        });
+        return;
+      }
+
+      zoomLevel = newZoom;
+      zoomLocked = true;
+      suppressFullscreenTapUntil = Date.now() + 700;
+      applyZoom();
+      updateView();
+    }
 
     function resetZoom(lockOff = true) {
       zoomLevel = 1;
       zoomLocked = !lockOff ? zoomLocked : false;
-      lastZoomInteraction = Date.now();
       suppressFullscreenTapUntil = Date.now() + 700;
       applyZoom();
       if (lockOff) localStorage.removeItem('cbz_zoom_locked');
@@ -676,10 +644,9 @@
       if (theme === 'mobile' && mode === 'scroll') {
         const portrait = document.body.classList.contains('portrait');
         zoomLevel = portrait ? 1 : 0.84;
-        applyZoom();
-        return;
+      } else {
+        zoomLevel = 1;
       }
-      zoomLevel = 1;
       applyZoom();
     }
 
@@ -734,6 +701,9 @@
       bookPrev.disabled = true;
       bookNext.disabled = true;
       dropzone.classList.remove('hidden');
+      zoomLocked = false;
+      zoomLevel = 1;
+      applyZoom();
     }
 
     async function loadImageFiles(fileList) {
@@ -745,8 +715,7 @@
         return;
       }
       for (const file of files) {
-        const url = URL.createObjectURL(file);
-        pages.push({ name: file.name, url });
+        pages.push({ name: file.name, url: URL.createObjectURL(file) });
       }
       currentIndex = 0;
       setStatus(`โหลดแล้ว ${pages.length} หน้า`);
@@ -773,8 +742,7 @@
       }
       for (const name of entries) {
         const blob = await zip.file(name).async('blob');
-        const url = URL.createObjectURL(blob);
-        pages.push({ name, url });
+        pages.push({ name, url: URL.createObjectURL(blob) });
       }
       currentIndex = 0;
       setStatus(`โหลดแล้ว ${pages.length} หน้า`);
@@ -840,7 +808,6 @@
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'thumb-item';
-          btn.dataset.index = String(index);
           const img = document.createElement('img');
           img.loading = 'lazy';
           img.decoding = 'async';
@@ -901,11 +868,8 @@
       scrollView.classList.toggle('hidden', !showScroll);
       bookShell.classList.toggle('hidden', showScroll);
 
-      if (showScroll) {
-        renderScroll();
-      } else {
-        renderBook();
-      }
+      if (showScroll) renderScroll();
+      else renderBook();
 
       updateButtons();
       updateThumbActive();
@@ -950,21 +914,13 @@
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // ─── FIX 1 (ต่อ): toggleFullscreen สำหรับ iOS ────────────────────────────
-    // iOS Safari ไม่รองรับ requestFullscreen() บน webpage ปกติ
-    // เมื่อเรียก API นี้ iOS จะแสดง dialog ว่า "คุณกำลังกรอกข้อมูล" แล้วออก
-    // แก้: บน iOS ใช้ CSS class toggle เท่านั้น ไม่เรียก API เลย
     async function toggleFullscreen() {
-      const ios = isIOS();
-      const hasApi = !!document.documentElement.requestFullscreen;
-
-      if (ios || !hasApi) {
-        // CSS-only fullscreen สำหรับ iOS และ browser ที่ไม่รองรับ API
-        document.body.classList.toggle('fullscreen-reading');
-        return;
-      }
-
       try {
+        if (isIOS() || !document.documentElement.requestFullscreen) {
+          document.body.classList.toggle('fullscreen-reading');
+          return;
+        }
+
         if (!document.fullscreenElement) {
           await document.documentElement.requestFullscreen();
           document.body.classList.add('fullscreen-reading');
@@ -973,7 +929,6 @@
           document.body.classList.remove('fullscreen-reading');
         }
       } catch (e) {
-        // Fallback: ถ้า API ล้มเหลว ใช้ CSS class แทน
         console.error('Fullscreen API error:', e);
         document.body.classList.toggle('fullscreen-reading');
       }
@@ -983,14 +938,8 @@
       document.body.classList.toggle('fullscreen-reading', !!document.fullscreenElement);
     }
 
-    function zoomFromCenter(nextZoom, userAction = true) {
-      const rect = reader.getBoundingClientRect();
-      zoomAtPoint(nextZoom, rect.width / 2, rect.height / 2, userAction);
-    }
-
-    // events
+    // Events
     openFileBtn.addEventListener('click', () => fileInput.click());
-
     fileInput.addEventListener('change', async (e) => {
       await loadSelectedFiles(e.target.files);
       e.target.value = '';
@@ -1049,7 +998,6 @@
 
     reader.addEventListener('dblclick', () => {
       if (!pages.length) return;
-      if (Date.now() < suppressFullscreenTapUntil) return;
       if (Math.abs(zoomLevel - 1) > 0.001) {
         zoomLocked = false;
         resetZoom(true);
@@ -1057,58 +1005,34 @@
     });
 
     // Swipe and pinch
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let tapLastTime = 0;
-    let pinchStartDistance = 0;
-    let pinchStartZoom = 1;
-    let pinchActive = false;
-    let lastZoomInteraction = 0;
-    let suppressFullscreenTapUntil = 0;
-
-    // ─── FIX (pinch drift): state ที่เซฟตอนเริ่ม pinch ──────────────────────
-    // ปัญหาเดิม: touchmove ทุก frame อ่าน reader.scrollLeft เพื่อคำนวณ scroll ใหม่
-    // แต่เราใช้ rAF เลื่อน scroll update → frame ถัดไปอ่านค่าเก่า (stale) เสมอ
-    // สะสมทุก frame → scroll หลุดไปข้าง
-    // แก้: เซฟ scroll + จุด pinch ตอนเริ่ม pinch ครั้งเดียว
-    // ทุก frame คำนวณ target จาก baseline นั้นโดยตรง ไม่อ่าน scrollLeft อีก
-    let pinchStartScrollLeft = 0;
-    let pinchStartScrollTop  = 0;
-    let pinchStartRelX = 0; // จุดกึ่งกลางนิ้วสองนิ้วตอนเริ่ม relative to reader
-    let pinchStartRelY = 0;
-    let pinchRafId = null;  // เก็บ rAF id เพื่อ cancel frame เก่าก่อน queue ใหม่
-
-    // ─── FIX 2+3: touchstart ───────────────────────────────────────────────────
-    // เปลี่ยน passive: true → passive: false เพื่อให้เรียก preventDefault() ได้
-    // สำหรับ 2-finger touch → preventDefault() ป้องกัน iOS native pinch-zoom
-    // เพิ่ม reader.classList.add('pinching') → CSS ปิด touch-action native ระหว่าง pinch
     reader.addEventListener('touchstart', (e) => {
       if (!pages.length) return;
+
       if (e.touches.length === 2) {
-        e.preventDefault(); // ป้องกัน iOS จาก native zoom gesture
+        e.preventDefault();
         reader.classList.add('pinching');
+        pinchActive = true;
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         pinchStartDistance = Math.hypot(dx, dy);
         pinchStartZoom = zoomLevel;
 
-        // เซฟ scroll และจุดกึ่งกลาง ณ จุดเริ่มต้น pinch
-        // ใช้เป็น baseline คงที่สำหรับการคำนวณทุก frame
         const rect = reader.getBoundingClientRect();
-        pinchZoom(
-          pinchStartZoom * ratio
-        );
-
-        pinchActive = true;
-        lastZoomInteraction = Date.now();
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        pinchAnchorX = clamp(midX - rect.left, 0, rect.width);
+        pinchAnchorY = clamp(midY - rect.top, 0, rect.height);
+        pinchStartScrollLeft = reader.scrollLeft;
+        pinchStartScrollTop = reader.scrollTop;
         suppressFullscreenTapUntil = Date.now() + 700;
         return;
       }
+
       const t = e.changedTouches[0];
       if (!t) return;
       touchStartX = t.clientX;
       touchStartY = t.clientY;
-    }, { passive: false }); // ← เปลี่ยนเป็น passive: false เพื่อให้ preventDefault() ทำงาน
+    }, { passive: false });
 
     reader.addEventListener('touchmove', (e) => {
       if (!pinchActive || e.touches.length !== 2) return;
@@ -1118,16 +1042,11 @@
       const distance = Math.hypot(dx, dy);
       if (!pinchStartDistance) return;
       const ratio = distance / pinchStartDistance;
-      zoomLocked = true;
-      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      zoomAtPoint(pinchStartZoom * ratio, midX, midY, true);
+      zoomPinch(pinchStartZoom * ratio);
     }, { passive: false });
 
-    // ─── FIX 3 (ต่อ): touchend ────────────────────────────────────────────────
-    // ลบ 'pinching' class เสมอเมื่อ touch จบ เพื่อให้ scroll กลับมาทำงาน
     reader.addEventListener('touchend', (e) => {
-      reader.classList.remove('pinching'); // ← คืน touch-action ปกติ
+      reader.classList.remove('pinching');
       if (!pages.length) return;
       if (e.touches && e.touches.length >= 2) return;
       if (pinchActive) {
@@ -1135,17 +1054,20 @@
         suppressFullscreenTapUntil = Date.now() + 700;
         return;
       }
+
       const now = Date.now();
       const t = e.changedTouches[0];
       if (!t) return;
       const dx = t.clientX - touchStartX;
       const dy = t.clientY - touchStartY;
+
       if (Math.abs(dx) > 50 && Math.abs(dy) < 35 && mode === 'book') {
         if (dx < 0) nextPage();
         else prevPage();
         return;
       }
-      if (Date.now() < suppressFullscreenTapUntil) {
+
+      if (now < suppressFullscreenTapUntil) {
         tapLastTime = now;
         return;
       }
@@ -1161,18 +1083,26 @@
       }
     }, { passive: true });
 
-    // FIX: ลบ pinching class เมื่อ touch ถูก cancel (เช่น incoming call, notification)
     reader.addEventListener('touchcancel', () => {
       reader.classList.remove('pinching');
       pinchActive = false;
     }, { passive: true });
 
+    window.addEventListener('blur', () => {
+      reader.classList.remove('pinching');
+      pinchActive = false;
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        reader.classList.remove('pinching');
+        pinchActive = false;
+      }
+    });
+
     reader.addEventListener('wheel', (e) => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      zoomLocked = true;
-      lastZoomInteraction = Date.now();
-      suppressFullscreenTapUntil = Date.now() + 700;
       const delta = e.deltaY > 0 ? -0.08 : 0.08;
       zoomFromCenter(zoomLevel + delta, true);
     }, { passive: false });
@@ -1184,7 +1114,6 @@
     setMode(mode);
     setThumbsOpen(thumbsOpen);
     if (!zoomLocked) autoFitZoom();
-    else applyZoom();
     updateView();
 
     window.addEventListener('resize', () => {
