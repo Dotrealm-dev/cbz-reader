@@ -571,7 +571,7 @@
     }
 
     function applyPageZoom() {
-      pageZoom = clamp(pageZoom, 0.75, 2.5);
+      pageZoom = clamp(pageZoom, 0.25, 2.5);
       document.documentElement.style.setProperty('--scroll-scale', pageZoom);
       localStorage.setItem('cbz_page_zoom', String(pageZoom));
       const pct = Math.round(pageZoom * 100);
@@ -580,7 +580,7 @@
     }
 
     function setPageZoom(nextZoom) {
-      pageZoom = clamp(Number(nextZoom) || 1, 0.75, 2.5);
+      pageZoom = clamp(Number(nextZoom) || 1, 0.25, 2.5);
       applyPageZoom();
     }
 
