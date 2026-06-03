@@ -131,7 +131,14 @@
       position: relative;
       touch-action: pan-y pan-x;
       /* FIX: ป้องกัน bounce effect บน iOS ที่ทำให้ zoom กระตุก */
-      overscroll-behavior: contain;
+      .scroll-view {
+          transform-origin: top center;
+        }
+        
+      .reader {
+          overscroll-behavior: none;
+          -webkit-overflow-scrolling: auto;
+        }
     }
 
     .reader.scroll {
@@ -627,6 +634,31 @@
       applyZoom();
       updateView();
     }
+    function pinchZoom(nextZoom) {
+      const oldZoom = zoomLevel;
+      const newZoom = clamp(nextZoom, 0.5, 3);
+    
+      if (Math.abs(newZoom - oldZoom) < 0.0001) return;
+    
+      const scaleFactor = newZoom / oldZoom;
+    
+      zoomLevel = newZoom;
+      applyZoom();
+    
+      requestAnimationFrame(() => {
+    
+        reader.scrollLeft =
+          (pinchStartScrollLeft + pinchStartRelX) *
+          scaleFactor -
+          pinchStartRelX;
+    
+        reader.scrollTop =
+          (pinchStartScrollTop + pinchStartRelY) *
+          scaleFactor -
+          pinchStartRelY;
+    
+      });
+    }
 
     function setZoom(nextZoom, userAction = true) {
       const rect = reader.getBoundingClientRect();
@@ -1070,12 +1102,9 @@
         // เซฟ scroll และจุดกึ่งกลาง ณ จุดเริ่มต้น pinch
         // ใช้เป็น baseline คงที่สำหรับการคำนวณทุก frame
         const rect = reader.getBoundingClientRect();
-        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        pinchStartRelX = clamp(midX - rect.left, 0, rect.width);
-        pinchStartRelY = clamp(midY - rect.top, 0, rect.height);
-        pinchStartScrollLeft = reader.scrollLeft;
-        pinchStartScrollTop  = reader.scrollTop;
+        pinchZoom(
+          pinchStartZoom * ratio
+        );
 
         pinchActive = true;
         lastZoomInteraction = Date.now();
