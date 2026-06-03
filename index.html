@@ -15,7 +15,7 @@
       --muted: #9aa3b2;
       --accent: #5aa9ff;
       --border: #2a3140;
-      --shadow: rgba(0,0,0,.35);
+      --shadow: rgba(0, 0, 0, .35);
       --reader-bg: #111318;
       --page-bg: #ffffff;
       --thumb-w: 112px;
@@ -23,7 +23,9 @@
       --scroll-scale: 1;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     html,
     body {
@@ -37,14 +39,12 @@
       overflow: auto;
     }
 
-    body.mobile { --reader-bg: #0b0d12; }
-    body.pc { --reader-bg: #131722; }
+    body.mobile {
+      --reader-bg: #0b0d12;
+    }
 
-    .page-frame {
-      width: 100%;
-      min-height: 100vh;
-      min-height: 100dvh;
-      position: relative;
+    body.pc {
+      --reader-bg: #131722;
     }
 
     .app {
@@ -120,7 +120,7 @@
       padding: 16px;
       border: 2px dashed var(--border);
       border-radius: 16px;
-      background: rgba(255,255,255,.02);
+      background: rgba(255, 255, 255, .02);
       color: var(--muted);
       text-align: center;
       user-select: none;
@@ -129,7 +129,7 @@
     .dropzone.dragover {
       border-color: var(--accent);
       color: var(--text);
-      background: rgba(90,169,255,.08);
+      background: rgba(90, 169, 255, .08);
     }
 
     .reader {
@@ -140,6 +140,11 @@
       overscroll-behavior: none;
       -webkit-overflow-scrolling: touch;
       overflow-anchor: none;
+      touch-action: auto;
+    }
+
+    .reader.scroll {
+      overflow: auto;
     }
 
     .scroll-view {
@@ -154,18 +159,17 @@
     }
 
     .scroll-page {
-      width: 100%;
+      width: calc(100% * var(--scroll-scale));
       display: block;
       line-height: 0;
-      margin: 0;
+      margin: 0 auto;
       padding: 0;
       overflow: hidden;
     }
 
     .scroll-page img {
       display: block;
-      width: calc(100% * var(--scroll-scale));
-      max-width: none;
+      width: 100%;
       height: auto;
       margin: 0 auto;
       border: none;
@@ -264,7 +268,7 @@
       position: absolute;
       top: 12px;
       right: 12px;
-      background: rgba(0,0,0,.55);
+      background: rgba(0, 0, 0, .55);
       color: white;
       padding: 8px 10px;
       border-radius: 999px;
@@ -273,7 +277,9 @@
       pointer-events: none;
     }
 
-    .hidden { display: none !important; }
+    .hidden {
+      display: none !important;
+    }
 
     .thumb-panel {
       position: fixed;
@@ -289,7 +295,7 @@
       z-index: 28;
       overflow-y: auto;
       padding: 8px;
-      box-shadow: -8px 0 24px rgba(0,0,0,.22);
+      box-shadow: -8px 0 24px rgba(0, 0, 0, .22);
     }
 
     body.fullscreen-reading .thumb-panel {
@@ -412,7 +418,9 @@
 
     @media (max-width: 700px) {
       :root { --thumb-w: 96px; }
-      .topbar { gap: 6px; }
+      .topbar {
+        gap: 6px;
+      }
       button, input[type="file"] {
         padding: 9px 10px;
         font-size: 13px;
@@ -422,73 +430,70 @@
 </head>
 
 <body class="mobile portrait">
-  <div id="pageFrame" class="page-frame">
-    <div class="app">
-      <div class="topbar">
-        <div class="group">
-          <input id="fileInput" type="file" multiple />
-          <button id="openFileBtn">Open</button>
-          <button id="btnMobile" class="active">Mobile</button>
-          <button id="btnPc">PC</button>
-          <button id="btnScroll" class="active">Scroll</button>
-          <button id="btnBook">Book</button>
-          <button id="thumbToggleBtn">Thumbs</button>
-          <button id="zoomOutBtn">－</button>
-          <button id="zoomResetBtn">100%</button>
-          <button id="zoomInBtn">＋</button>
-          <button id="fullscreenBtn">Fullscreen</button>
-        </div>
-
-        <div class="group">
-          <button id="prevBtn" disabled>Prev</button>
-          <button id="nextBtn" disabled>Next</button>
-          <button id="firstBtn" disabled>First</button>
-          <button id="lastBtn" disabled>Last</button>
-        </div>
-
-        <div class="status" id="status">เลือกไฟล์ CBZ/ZIP หรือรูปภาพ</div>
+  <div class="app">
+    <div class="topbar">
+      <div class="group">
+        <input id="fileInput" type="file" accept=".cbz,.zip,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif" multiple />
+        <button id="openFileBtn">Open</button>
+        <button id="btnMobile" class="active">Mobile</button>
+        <button id="btnPc">PC</button>
+        <button id="btnScroll" class="active">Scroll</button>
+        <button id="btnBook">Book</button>
+        <button id="thumbToggleBtn">Thumbs</button>
+        <button id="zoomOutBtn">－</button>
+        <button id="zoomResetBtn">100%</button>
+        <button id="zoomInBtn">＋</button>
+        <button id="fullscreenBtn">Fullscreen</button>
       </div>
 
-      <div id="dropzone" class="dropzone">ลากไฟล์ .cbz, .zip หรือรูปภาพมาวางตรงนี้</div>
+      <div class="group">
+        <button id="prevBtn" disabled>Prev</button>
+        <button id="nextBtn" disabled>Next</button>
+        <button id="firstBtn" disabled>First</button>
+        <button id="lastBtn" disabled>Last</button>
+      </div>
 
-      <div id="reader" class="reader scroll">
-        <div id="scrollView" class="scroll-view hidden"></div>
+      <div class="status" id="status">เลือกไฟล์ CBZ/ZIP หรือรูปภาพ</div>
+    </div>
 
-        <div id="bookShell" class="book-shell hidden">
-          <div class="book">
-            <div class="page-counter" id="pageCounter">0 / 0</div>
+    <div id="dropzone" class="dropzone">ลากไฟล์ .cbz, .zip หรือรูปภาพมาวางตรงนี้</div>
 
-            <div class="spread">
-              <div class="page"><img id="leftPage" alt="left page"></div>
-              <div class="page"><img id="rightPage" alt="right page"></div>
-            </div>
+    <div id="reader" class="reader scroll">
+      <div id="scrollView" class="scroll-view hidden"></div>
 
-            <div class="single-page">
-              <img id="singlePage" alt="single page">
-            </div>
+      <div id="bookShell" class="book-shell hidden">
+        <div class="book">
+          <div class="page-counter" id="pageCounter">0 / 0</div>
 
-            <div class="nav-bottom">
-              <button class="navbtn" id="bookPrev">◀</button>
-              <button class="navbtn" id="bookNext">▶</button>
-            </div>
+          <div class="spread">
+            <div class="page"><img id="leftPage" alt="left page"></div>
+            <div class="page"><img id="rightPage" alt="right page"></div>
+          </div>
+
+          <div class="single-page">
+            <img id="singlePage" alt="single page">
+          </div>
+
+          <div class="nav-bottom">
+            <button class="navbtn" id="bookPrev">◀</button>
+            <button class="navbtn" id="bookNext">▶</button>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div id="thumbPanel" class="thumb-panel hidden"></div>
+  <div id="thumbPanel" class="thumb-panel hidden"></div>
 
-    <div class="fullscreen-tools">
-      <button id="fsThumbBtn">Thumbs</button>
-      <button id="fsZoomOutBtn">－</button>
-      <button id="fsZoomResetBtn">100%</button>
-      <button id="fsZoomInBtn">＋</button>
-      <button id="fsExitBtn">Exit</button>
-    </div>
+  <div class="fullscreen-tools">
+    <button id="fsThumbBtn">Thumbs</button>
+    <button id="fsZoomOutBtn">－</button>
+    <button id="fsZoomResetBtn">100%</button>
+    <button id="fsZoomInBtn">＋</button>
+    <button id="fsExitBtn">Exit</button>
   </div>
 
   <script>
-    const pageFrame = document.getElementById('pageFrame');
     const fileInput = document.getElementById('fileInput');
     const openFileBtn = document.getElementById('openFileBtn');
     const dropzone = document.getElementById('dropzone');
@@ -538,11 +543,25 @@
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     }
 
-    function setStatus(msg) { statusEl.textContent = msg; }
-    function isImageFile(name) { return /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(name); }
-    function isZipFile(name) { return /\.(cbz|zip)$/i.test(name); }
-    function naturalSort(a, b) { return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }); }
-    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+    }
+
+    function isImageFile(name) {
+      return /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(name);
+    }
+
+    function isZipFile(name) {
+      return /\.(cbz|zip)$/i.test(name);
+    }
+
+    function naturalSort(a, b) {
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    }
+
+    function clamp(n, min, max) {
+      return Math.max(min, Math.min(max, n));
+    }
 
     function updateOrientationState() {
       const portrait = window.matchMedia('(orientation: portrait)').matches || window.innerHeight >= window.innerWidth;
@@ -554,7 +573,9 @@
       return mode === 'book' && (theme === 'pc' || document.body.classList.contains('landscape'));
     }
 
-    function getBookStep() { return isSpreadView() ? 2 : 1; }
+    function getBookStep() {
+      return isSpreadView() ? 2 : 1;
+    }
 
     function getMaxStartIndex() {
       if (!pages.length) return 0;
@@ -580,12 +601,30 @@
     }
 
     function setPageZoom(nextZoom) {
-      pageZoom = clamp(Number(nextZoom) || 1, 0.25, 2.5);
+      const oldZoom = pageZoom;
+      const newZoom = clamp(Number(nextZoom) || 1, 0.25, 2.5);
+      if (Math.abs(newZoom - oldZoom) < 0.0001) return;
+
+      const oldTop = reader.scrollTop;
+      const oldLeft = reader.scrollLeft;
+      const scale = newZoom / oldZoom;
+
+      pageZoom = newZoom;
       applyPageZoom();
+
+      requestAnimationFrame(() => {
+        reader.scrollTop = oldTop * scale;
+        reader.scrollLeft = oldLeft * scale;
+      });
     }
 
-    function zoomIn() { setPageZoom(pageZoom + 0.1); }
-    function zoomOut() { setPageZoom(pageZoom - 0.1); }
+    function zoomIn() {
+      setPageZoom(pageZoom + 0.1);
+    }
+
+    function zoomOut() {
+      setPageZoom(pageZoom - 0.1);
+    }
 
     function resetZoom() {
       pageZoom = 1;
@@ -620,7 +659,9 @@
       fsThumbBtn.classList.toggle('active', thumbsOpen);
     }
 
-    function toggleThumbs() { setThumbsOpen(!thumbsOpen); }
+    function toggleThumbs() {
+      setThumbsOpen(!thumbsOpen);
+    }
 
     function clearPages() {
       for (const p of pages) {
@@ -648,14 +689,20 @@
     async function loadImageFiles(fileList) {
       clearPages();
       setStatus('กำลังอ่านรูปภาพ...');
-      const files = [...fileList].filter(f => isImageFile(f.name)).sort((a, b) => naturalSort(a.name, b.name));
+
+      const files = [...fileList]
+        .filter(f => isImageFile(f.name))
+        .sort((a, b) => naturalSort(a.name, b.name));
+
       if (!files.length) {
         setStatus('ไม่พบรูปภาพ');
         return;
       }
+
       for (const file of files) {
         pages.push({ name: file.name, url: URL.createObjectURL(file) });
       }
+
       currentIndex = 0;
       setStatus(`โหลดแล้ว ${pages.length} หน้า`);
       renderThumbs();
@@ -667,22 +714,31 @@
         alert('JSZip โหลดไม่สำเร็จ');
         return;
       }
+
       clearPages();
       setStatus('กำลังอ่านไฟล์...');
+
       const zip = await JSZip.loadAsync(file);
       const entries = [];
+
       zip.forEach((relativePath, zipEntry) => {
-        if (!zipEntry.dir && isImageFile(zipEntry.name)) entries.push(zipEntry.name);
+        if (!zipEntry.dir && isImageFile(zipEntry.name)) {
+          entries.push(zipEntry.name);
+        }
       });
+
       entries.sort(naturalSort);
+
       if (!entries.length) {
         setStatus('ไม่พบรูปในไฟล์ CBZ');
         return;
       }
+
       for (const name of entries) {
         const blob = await zip.file(name).async('blob');
         pages.push({ name, url: URL.createObjectURL(blob) });
       }
+
       currentIndex = 0;
       setStatus(`โหลดแล้ว ${pages.length} หน้า`);
       renderThumbs();
@@ -692,6 +748,7 @@
     async function loadSelectedFiles(fileList) {
       const files = [...fileList];
       if (!files.length) return;
+
       const first = files[0];
       try {
         if (files.length > 1 || isImageFile(first.name)) {
@@ -725,13 +782,20 @@
         for (let i = 0; i < pages.length; i++) {
           const wrap = document.createElement('div');
           wrap.className = 'scroll-page';
+
           const img = document.createElement('img');
           img.loading = 'lazy';
           img.decoding = 'async';
           img.src = pages[i].url;
           img.alt = pages[i].name;
+
           wrap.appendChild(img);
           scrollView.appendChild(wrap);
+        }
+      } else {
+        for (let i = 0; i < pages.length; i++) {
+          const img = scrollView.children[i]?.querySelector('img');
+          if (img && img.src !== pages[i].url) img.src = pages[i].url;
         }
       }
     }
@@ -741,26 +805,32 @@
         thumbPanel.innerHTML = '';
         return;
       }
+
       if (thumbPanel.childElementCount !== pages.length) {
         thumbPanel.innerHTML = '';
         pages.forEach((page, index) => {
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'thumb-item';
+
           const img = document.createElement('img');
           img.loading = 'lazy';
           img.decoding = 'async';
           img.src = page.url;
           img.alt = page.name;
+
           btn.appendChild(img);
+
           btn.addEventListener('click', () => {
             currentIndex = index;
             updateView();
             syncScrollToCurrent();
           });
+
           thumbPanel.appendChild(btn);
         });
       }
+
       updateThumbActive();
     }
 
@@ -772,14 +842,21 @@
     function renderBook() {
       const total = pages.length;
       if (!total) return;
+
       if (isSpreadView()) {
         normalizeSpreadIndex();
+
         const leftIndex = currentIndex;
         const rightIndex = currentIndex + 1;
         const rightExists = rightIndex < total;
-        pageCounter.textContent = rightExists ? `${leftIndex + 1}-${rightIndex + 1} / ${total}` : `${leftIndex + 1} / ${total}`;
+
+        pageCounter.textContent = rightExists
+          ? `${leftIndex + 1}-${rightIndex + 1} / ${total}`
+          : `${leftIndex + 1} / ${total}`;
+
         leftPage.src = pages[leftIndex]?.url || '';
         leftPage.alt = pages[leftIndex]?.name || '';
+
         rightPage.src = rightExists ? (pages[rightIndex]?.url || '') : '';
         rightPage.alt = rightExists ? (pages[rightIndex]?.name || '') : '';
         rightPage.parentElement.style.visibility = rightExists ? 'visible' : 'hidden';
@@ -802,6 +879,7 @@
       }
 
       dropzone.classList.add('hidden');
+
       const showScroll = mode === 'scroll';
       reader.classList.toggle('scroll', showScroll);
       scrollView.classList.toggle('hidden', !showScroll);
@@ -905,12 +983,15 @@
     btnBook.addEventListener('click', () => setMode('book'));
     thumbToggleBtn.addEventListener('click', toggleThumbs);
     fsThumbBtn.addEventListener('click', toggleThumbs);
+
     zoomOutBtn.addEventListener('click', zoomOut);
-    zoomResetBtn.addEventListener('click', resetZoom);
     zoomInBtn.addEventListener('click', zoomIn);
+    zoomResetBtn.addEventListener('click', resetZoom);
+
     fsZoomOutBtn.addEventListener('click', zoomOut);
-    fsZoomResetBtn.addEventListener('click', resetZoom);
     fsZoomInBtn.addEventListener('click', zoomIn);
+    fsZoomResetBtn.addEventListener('click', resetZoom);
+
     fullscreenBtn.addEventListener('click', toggleFullscreen);
     fsExitBtn.addEventListener('click', toggleFullscreen);
 
@@ -939,7 +1020,7 @@
     let touchStartY = 0;
 
     reader.addEventListener('touchstart', (e) => {
-      if (!pages.length || e.touches.length !== 1) return;
+      if (!pages.length || mode !== 'book' || e.touches.length !== 1) return;
       const t = e.touches[0];
       touchStartX = t.clientX;
       touchStartY = t.clientY;
