@@ -1041,6 +1041,18 @@
     let lastZoomInteraction = 0;
     let suppressFullscreenTapUntil = 0;
 
+    // ─── FIX (pinch drift): state ที่เซฟตอนเริ่ม pinch ──────────────────────
+    // ปัญหาเดิม: touchmove ทุก frame อ่าน reader.scrollLeft เพื่อคำนวณ scroll ใหม่
+    // แต่เราใช้ rAF เลื่อน scroll update → frame ถัดไปอ่านค่าเก่า (stale) เสมอ
+    // สะสมทุก frame → scroll หลุดไปข้าง
+    // แก้: เซฟ scroll + จุด pinch ตอนเริ่ม pinch ครั้งเดียว
+    // ทุก frame คำนวณ target จาก baseline นั้นโดยตรง ไม่อ่าน scrollLeft อีก
+    let pinchStartScrollLeft = 0;
+    let pinchStartScrollTop  = 0;
+    let pinchStartRelX = 0; // จุดกึ่งกลางนิ้วสองนิ้วตอนเริ่ม relative to reader
+    let pinchStartRelY = 0;
+    let pinchRafId = null;  // เก็บ rAF id เพื่อ cancel frame เก่าก่อน queue ใหม่
+
     // ─── FIX 2+3: touchstart ───────────────────────────────────────────────────
     // เปลี่ยน passive: true → passive: false เพื่อให้เรียก preventDefault() ได้
     // สำหรับ 2-finger touch → preventDefault() ป้องกัน iOS native pinch-zoom
@@ -1054,6 +1066,17 @@
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         pinchStartDistance = Math.hypot(dx, dy);
         pinchStartZoom = zoomLevel;
+
+        // เซฟ scroll และจุดกึ่งกลาง ณ จุดเริ่มต้น pinch
+        // ใช้เป็น baseline คงที่สำหรับการคำนวณทุก frame
+        const rect = reader.getBoundingClientRect();
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        pinchStartRelX = clamp(midX - rect.left, 0, rect.width);
+        pinchStartRelY = clamp(midY - rect.top, 0, rect.height);
+        pinchStartScrollLeft = reader.scrollLeft;
+        pinchStartScrollTop  = reader.scrollTop;
+
         pinchActive = true;
         lastZoomInteraction = Date.now();
         suppressFullscreenTapUntil = Date.now() + 700;
