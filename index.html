@@ -20,6 +20,7 @@
       --page-bg: #ffffff;
       --thumb-w: 112px;
       --topbar-h: 62px;
+      --scroll-scale: 1;
     }
 
     * { box-sizing: border-box; }
@@ -44,7 +45,6 @@
       min-height: 100vh;
       min-height: 100dvh;
       position: relative;
-      zoom: 1;
     }
 
     .app {
@@ -142,10 +142,6 @@
       overflow-anchor: none;
     }
 
-    .reader.scroll {
-      overflow: auto;
-    }
-
     .scroll-view {
       width: 100%;
       display: flex;
@@ -168,9 +164,10 @@
 
     .scroll-page img {
       display: block;
-      width: 100%;
+      width: calc(100% * var(--scroll-scale));
+      max-width: none;
       height: auto;
-      margin: 0;
+      margin: 0 auto;
       border: none;
       border-radius: 0;
       box-shadow: none;
@@ -415,9 +412,7 @@
 
     @media (max-width: 700px) {
       :root { --thumb-w: 96px; }
-      .topbar {
-        gap: 6px;
-      }
+      .topbar { gap: 6px; }
       button, input[type="file"] {
         padding: 9px 10px;
         font-size: 13px;
@@ -577,7 +572,7 @@
 
     function applyPageZoom() {
       pageZoom = clamp(pageZoom, 0.75, 2.5);
-      pageFrame.style.zoom = String(pageZoom);
+      document.documentElement.style.setProperty('--scroll-scale', pageZoom);
       localStorage.setItem('cbz_page_zoom', String(pageZoom));
       const pct = Math.round(pageZoom * 100);
       zoomResetBtn.textContent = `${pct}%`;
@@ -585,21 +580,8 @@
     }
 
     function setPageZoom(nextZoom) {
-      const oldZoom = pageZoom;
-      const newZoom = clamp(Number(nextZoom) || 1, 0.75, 2.5);
-      if (Math.abs(newZoom - oldZoom) < 0.0001) return;
-
-      const scale = newZoom / oldZoom;
-      const oldScrollTop = reader.scrollTop;
-      const oldScrollLeft = reader.scrollLeft;
-
-      pageZoom = newZoom;
+      pageZoom = clamp(Number(nextZoom) || 1, 0.75, 2.5);
       applyPageZoom();
-
-      requestAnimationFrame(() => {
-        reader.scrollTop = oldScrollTop * scale;
-        reader.scrollLeft = oldScrollLeft * scale;
-      });
     }
 
     function zoomIn() { setPageZoom(pageZoom + 0.1); }
