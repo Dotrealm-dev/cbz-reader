@@ -20,34 +20,39 @@
       --page-bg: #ffffff;
       --thumb-w: 112px;
       --topbar-h: 62px;
-      --zoom: 1;
     }
 
     * { box-sizing: border-box; }
 
-    html, body {
+    html,
+    body {
       margin: 0;
       padding: 0;
       width: 100%;
-      height: 100%;
+      min-height: 100%;
       background: var(--bg);
       color: var(--text);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      overflow: hidden;
+      overflow: auto;
     }
 
     body.mobile { --reader-bg: #0b0d12; }
     body.pc { --reader-bg: #131722; }
 
-    body.portrait {}
-    body.landscape {}
+    .page-frame {
+      width: 100%;
+      min-height: 100vh;
+      min-height: 100dvh;
+      position: relative;
+      zoom: 1;
+    }
 
     .app {
       display: flex;
       flex-direction: column;
+      min-height: 100vh;
+      min-height: 100dvh;
       width: 100%;
-      height: 100vh;
-      height: 100dvh;
       position: relative;
     }
 
@@ -62,6 +67,8 @@
       box-shadow: 0 2px 10px var(--shadow);
       z-index: 30;
       min-height: var(--topbar-h);
+      position: sticky;
+      top: 0;
     }
 
     .topbar .group {
@@ -81,7 +88,10 @@
       font-size: 14px;
     }
 
-    button { cursor: pointer; touch-action: manipulation; }
+    button {
+      cursor: pointer;
+      touch-action: manipulation;
+    }
 
     button.active {
       background: var(--accent);
@@ -124,17 +134,17 @@
 
     .reader {
       flex: 1;
-      overflow: hidden;
+      overflow: auto;
       background: var(--reader-bg);
       position: relative;
-      touch-action: pan-y pan-x;
       overscroll-behavior: none;
-      -webkit-overflow-scrolling: auto;
+      -webkit-overflow-scrolling: touch;
       overflow-anchor: none;
     }
 
-    .reader.scroll { overflow: auto; }
-    .reader.pinching { touch-action: none; }
+    .reader.scroll {
+      overflow: auto;
+    }
 
     .scroll-view {
       width: 100%;
@@ -158,10 +168,9 @@
 
     .scroll-page img {
       display: block;
-      width: calc(100% * var(--zoom));
-      max-width: none;
+      width: 100%;
       height: auto;
-      margin: 0 auto;
+      margin: 0;
       border: none;
       border-radius: 0;
       box-shadow: none;
@@ -216,6 +225,7 @@
       background: #fff;
       user-select: none;
       -webkit-user-drag: none;
+      pointer-events: none;
     }
 
     .single-page {
@@ -233,6 +243,7 @@
       border-radius: 12px;
       user-select: none;
       -webkit-user-drag: none;
+      pointer-events: none;
     }
 
     .nav-bottom {
@@ -290,7 +301,9 @@
       height: 100dvh;
     }
 
-    body.thumbs-open .thumb-panel { transform: translateX(0); }
+    body.thumbs-open .thumb-panel {
+      transform: translateX(0);
+    }
 
     .thumb-item {
       width: 100%;
@@ -303,7 +316,9 @@
       line-height: 0;
     }
 
-    .thumb-item.active { border-color: var(--accent); }
+    .thumb-item.active {
+      border-color: var(--accent);
+    }
 
     .thumb-item img {
       width: 100%;
@@ -313,6 +328,7 @@
       background: #fff;
       user-select: none;
       -webkit-user-drag: none;
+      pointer-events: none;
     }
 
     .fullscreen-tools {
@@ -324,13 +340,19 @@
       z-index: 40;
     }
 
-    body.fullscreen-reading .fullscreen-tools { display: flex; }
+    body.fullscreen-reading .fullscreen-tools {
+      display: flex;
+    }
 
     :fullscreen .topbar,
-    body.fullscreen-reading .topbar { display: none !important; }
+    body.fullscreen-reading .topbar {
+      display: none !important;
+    }
 
     :fullscreen .dropzone,
-    body.fullscreen-reading .dropzone { display: none !important; }
+    body.fullscreen-reading .dropzone {
+      display: none !important;
+    }
 
     :fullscreen .reader,
     body.fullscreen-reading .reader {
@@ -339,13 +361,14 @@
     }
 
     body.fullscreen-reading .app {
-      height: 100vh;
-      height: 100dvh;
+      min-height: 100vh;
+      min-height: 100dvh;
     }
 
     body.mobile .book {
       width: min(100vw, 100%);
       height: calc(100vh - var(--topbar-h));
+      height: calc(100dvh - var(--topbar-h));
     }
 
     body.fullscreen-reading .book {
@@ -354,12 +377,30 @@
       height: 100dvh;
     }
 
-    body.mobile.portrait .spread { display: none; }
-    body.mobile.portrait .single-page { display: block; }
-    body.mobile.landscape .spread { display: grid; }
-    body.mobile.landscape .single-page { display: none; }
-    body.pc .spread { display: grid; }
-    body.pc .single-page { display: none; }
+    body.mobile.portrait .spread {
+      display: none;
+    }
+
+    body.mobile.portrait .single-page {
+      display: block;
+    }
+
+    body.mobile.landscape .spread {
+      display: grid;
+    }
+
+    body.mobile.landscape .single-page {
+      display: none;
+    }
+
+    body.pc .spread {
+      display: grid;
+    }
+
+    body.pc .single-page {
+      display: none;
+    }
+
     body.pc .book {
       width: min(96vw, 1400px);
       height: min(90vh, 980px);
@@ -374,7 +415,9 @@
 
     @media (max-width: 700px) {
       :root { --thumb-w: 96px; }
-      .topbar { gap: 6px; }
+      .topbar {
+        gap: 6px;
+      }
       button, input[type="file"] {
         padding: 9px 10px;
         font-size: 13px;
@@ -384,70 +427,73 @@
 </head>
 
 <body class="mobile portrait">
-  <div class="app">
-    <div class="topbar">
-      <div class="group">
-        <input id="fileInput" type="file" multiple />
-        <button id="openFileBtn">Open</button>
-        <button id="btnMobile" class="active">Mobile</button>
-        <button id="btnPc">PC</button>
-        <button id="btnScroll" class="active">Scroll</button>
-        <button id="btnBook">Book</button>
-        <button id="thumbToggleBtn">Thumbs</button>
-        <button id="zoomOutBtn">－</button>
-        <button id="zoomResetBtn">100%</button>
-        <button id="zoomInBtn">＋</button>
-        <button id="fullscreenBtn">Fullscreen</button>
+  <div id="pageFrame" class="page-frame">
+    <div class="app">
+      <div class="topbar">
+        <div class="group">
+          <input id="fileInput" type="file" accept=".cbz,.zip,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif" multiple />
+          <button id="openFileBtn">Open</button>
+          <button id="btnMobile" class="active">Mobile</button>
+          <button id="btnPc">PC</button>
+          <button id="btnScroll" class="active">Scroll</button>
+          <button id="btnBook">Book</button>
+          <button id="thumbToggleBtn">Thumbs</button>
+          <button id="zoomOutBtn">－</button>
+          <button id="zoomResetBtn">100%</button>
+          <button id="zoomInBtn">＋</button>
+          <button id="fullscreenBtn">Fullscreen</button>
+        </div>
+
+        <div class="group">
+          <button id="prevBtn" disabled>Prev</button>
+          <button id="nextBtn" disabled>Next</button>
+          <button id="firstBtn" disabled>First</button>
+          <button id="lastBtn" disabled>Last</button>
+        </div>
+
+        <div class="status" id="status">เลือกไฟล์ CBZ/ZIP หรือรูปภาพ</div>
       </div>
 
-      <div class="group">
-        <button id="prevBtn" disabled>Prev</button>
-        <button id="nextBtn" disabled>Next</button>
-        <button id="firstBtn" disabled>First</button>
-        <button id="lastBtn" disabled>Last</button>
-      </div>
+      <div id="dropzone" class="dropzone">ลากไฟล์ .cbz, .zip หรือรูปภาพมาวางตรงนี้</div>
 
-      <div class="status" id="status">เลือกไฟล์ CBZ/ZIP หรือรูปภาพ</div>
-    </div>
+      <div id="reader" class="reader scroll">
+        <div id="scrollView" class="scroll-view hidden"></div>
 
-    <div id="dropzone" class="dropzone">ลากไฟล์ .cbz, .zip หรือรูปภาพมาวางตรงนี้</div>
+        <div id="bookShell" class="book-shell hidden">
+          <div class="book">
+            <div class="page-counter" id="pageCounter">0 / 0</div>
 
-    <div id="reader" class="reader scroll">
-      <div id="scrollView" class="scroll-view hidden"></div>
+            <div class="spread">
+              <div class="page"><img id="leftPage" alt="left page"></div>
+              <div class="page"><img id="rightPage" alt="right page"></div>
+            </div>
 
-      <div id="bookShell" class="book-shell hidden">
-        <div class="book">
-          <div class="page-counter" id="pageCounter">0 / 0</div>
+            <div class="single-page">
+              <img id="singlePage" alt="single page">
+            </div>
 
-          <div class="spread">
-            <div class="page"><img id="leftPage" alt="left page"></div>
-            <div class="page"><img id="rightPage" alt="right page"></div>
-          </div>
-
-          <div class="single-page">
-            <img id="singlePage" alt="single page">
-          </div>
-
-          <div class="nav-bottom">
-            <button class="navbtn" id="bookPrev">◀</button>
-            <button class="navbtn" id="bookNext">▶</button>
+            <div class="nav-bottom">
+              <button class="navbtn" id="bookPrev">◀</button>
+              <button class="navbtn" id="bookNext">▶</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div id="thumbPanel" class="thumb-panel hidden"></div>
+    <div id="thumbPanel" class="thumb-panel hidden"></div>
 
-  <div class="fullscreen-tools">
-    <button id="fsThumbBtn">Thumbs</button>
-    <button id="fsZoomOutBtn">－</button>
-    <button id="fsZoomResetBtn">100%</button>
-    <button id="fsZoomInBtn">＋</button>
-    <button id="fsExitBtn">Exit</button>
+    <div class="fullscreen-tools">
+      <button id="fsThumbBtn">Thumbs</button>
+      <button id="fsZoomOutBtn">－</button>
+      <button id="fsZoomResetBtn">100%</button>
+      <button id="fsZoomInBtn">＋</button>
+      <button id="fsExitBtn">Exit</button>
+    </div>
   </div>
 
   <script>
+    const pageFrame = document.getElementById('pageFrame');
     const fileInput = document.getElementById('fileInput');
     const openFileBtn = document.getElementById('openFileBtn');
     const dropzone = document.getElementById('dropzone');
@@ -486,31 +532,15 @@
     let theme = localStorage.getItem('cbz_theme') || 'mobile';
     let mode = localStorage.getItem('cbz_mode') || 'scroll';
     let thumbsOpen = localStorage.getItem('cbz_thumbs');
-    let zoomLevel = Number(localStorage.getItem('cbz_zoom') || '1');
-    let zoomLocked = localStorage.getItem('cbz_zoom_locked') === '1';
+    let pageZoom = Number(localStorage.getItem('cbz_page_zoom') || '1');
     let busy = false;
-
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let tapLastTime = 0;
-    let pinchStartDistance = 0;
-    let pinchStartZoom = 1;
-    let pinchActive = false;
-    let suppressFullscreenTapUntil = 0;
-    let pinchStartScrollLeft = 0;
-    let pinchStartScrollTop = 0;
-    let pinchAnchorX = 0;
-    let pinchAnchorY = 0;
-    let zoomRestoreRaf = 0;
 
     if (thumbsOpen === null) thumbsOpen = (theme === 'pc') ? '1' : '0';
     thumbsOpen = thumbsOpen === '1';
 
     function isIOS() {
-      return (
-        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-      );
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     }
 
     function setStatus(msg) { statusEl.textContent = msg; }
@@ -545,109 +575,39 @@
       if (currentIndex > getMaxStartIndex()) currentIndex = getMaxStartIndex();
     }
 
-    function applyZoom() {
-      zoomLevel = clamp(zoomLevel, 0.5, 3);
-      document.documentElement.style.setProperty('--zoom', zoomLevel);
-      localStorage.setItem('cbz_zoom', String(zoomLevel));
-      localStorage.setItem('cbz_zoom_locked', zoomLocked ? '1' : '0');
-      const pct = Math.round(zoomLevel * 100);
+    function applyPageZoom() {
+      pageZoom = clamp(pageZoom, 0.75, 2.5);
+      pageFrame.style.zoom = String(pageZoom);
+      localStorage.setItem('cbz_page_zoom', String(pageZoom));
+      const pct = Math.round(pageZoom * 100);
       zoomResetBtn.textContent = `${pct}%`;
       fsZoomResetBtn.textContent = `${pct}%`;
     }
 
-    function scheduleScrollRestore(nextLeft, nextTop) {
-      if (zoomRestoreRaf) cancelAnimationFrame(zoomRestoreRaf);
-      zoomRestoreRaf = requestAnimationFrame(() => {
-        reader.scrollLeft = Math.max(0, nextLeft);
-        reader.scrollTop = Math.max(0, nextTop);
-        zoomRestoreRaf = 0;
+    function setPageZoom(nextZoom) {
+      const oldZoom = pageZoom;
+      const newZoom = clamp(Number(nextZoom) || 1, 0.75, 2.5);
+      if (Math.abs(newZoom - oldZoom) < 0.0001) return;
+
+      const scale = newZoom / oldZoom;
+      const oldScrollTop = reader.scrollTop;
+      const oldScrollLeft = reader.scrollLeft;
+
+      pageZoom = newZoom;
+      applyPageZoom();
+
+      requestAnimationFrame(() => {
+        reader.scrollTop = oldScrollTop * scale;
+        reader.scrollLeft = oldScrollLeft * scale;
       });
     }
 
-    function zoomAtCurrentPoint(nextZoom, anchorX, anchorY, userAction = true) {
-      const oldZoom = zoomLevel;
-      const newZoom = clamp(Number(nextZoom) || 1, 0.5, 3);
-      if (Math.abs(newZoom - oldZoom) < 0.0001) return;
+    function zoomIn() { setPageZoom(pageZoom + 0.1); }
+    function zoomOut() { setPageZoom(pageZoom - 0.1); }
 
-      if (mode === 'scroll') {
-        const scale = newZoom / oldZoom;
-        const currentLeft = reader.scrollLeft;
-        const currentTop = reader.scrollTop;
-
-        zoomLevel = newZoom;
-        if (userAction) {
-          zoomLocked = true;
-          suppressFullscreenTapUntil = Date.now() + 700;
-        }
-        applyZoom();
-
-        scheduleScrollRestore(
-          (currentLeft + anchorX) * scale - anchorX,
-          (currentTop + anchorY) * scale - anchorY
-        );
-        return;
-      }
-
-      zoomLevel = newZoom;
-      if (userAction) {
-        zoomLocked = true;
-        suppressFullscreenTapUntil = Date.now() + 700;
-      }
-      applyZoom();
-      updateView();
-    }
-
-    function zoomFromCenter(nextZoom, userAction = true) {
-      const rect = reader.getBoundingClientRect();
-      zoomAtCurrentPoint(nextZoom, rect.width / 2, rect.height / 2, userAction);
-    }
-
-    function zoomPinch(nextZoom) {
-      const oldZoom = zoomLevel;
-      const newZoom = clamp(Number(nextZoom) || 1, 0.5, 3);
-      if (Math.abs(newZoom - oldZoom) < 0.0001) return;
-
-      if (mode === 'scroll') {
-        const scale = newZoom / oldZoom;
-        zoomLevel = newZoom;
-        zoomLocked = true;
-        suppressFullscreenTapUntil = Date.now() + 700;
-        applyZoom();
-
-        if (zoomRestoreRaf) cancelAnimationFrame(zoomRestoreRaf);
-        zoomRestoreRaf = requestAnimationFrame(() => {
-          reader.scrollLeft = Math.max(0, (pinchStartScrollLeft + pinchAnchorX) * scale - pinchAnchorX);
-          reader.scrollTop = Math.max(0, (pinchStartScrollTop + pinchAnchorY) * scale - pinchAnchorY);
-          zoomRestoreRaf = 0;
-        });
-        return;
-      }
-
-      zoomLevel = newZoom;
-      zoomLocked = true;
-      suppressFullscreenTapUntil = Date.now() + 700;
-      applyZoom();
-      updateView();
-    }
-
-    function resetZoom(lockOff = true) {
-      zoomLevel = 1;
-      zoomLocked = !lockOff ? zoomLocked : false;
-      suppressFullscreenTapUntil = Date.now() + 700;
-      applyZoom();
-      if (lockOff) localStorage.removeItem('cbz_zoom_locked');
-      updateView();
-    }
-
-    function autoFitZoom() {
-      if (zoomLocked) return;
-      if (theme === 'mobile' && mode === 'scroll') {
-        const portrait = document.body.classList.contains('portrait');
-        zoomLevel = portrait ? 1 : 0.84;
-      } else {
-        zoomLevel = 1;
-      }
-      applyZoom();
+    function resetZoom() {
+      pageZoom = 1;
+      applyPageZoom();
     }
 
     function setTheme(t) {
@@ -658,7 +618,6 @@
       btnMobile.classList.toggle('active', t === 'mobile');
       btnPc.classList.toggle('active', t === 'pc');
       if (theme === 'pc') setThumbsOpen(true);
-      if (!zoomLocked) autoFitZoom();
       updateView();
     }
 
@@ -667,7 +626,6 @@
       localStorage.setItem('cbz_mode', m);
       btnScroll.classList.toggle('active', m === 'scroll');
       btnBook.classList.toggle('active', m === 'book');
-      if (!zoomLocked) autoFitZoom();
       updateView();
     }
 
@@ -701,9 +659,6 @@
       bookPrev.disabled = true;
       bookNext.disabled = true;
       dropzone.classList.remove('hidden');
-      zoomLocked = false;
-      zoomLevel = 1;
-      applyZoom();
     }
 
     async function loadImageFiles(fileList) {
@@ -868,8 +823,11 @@
       scrollView.classList.toggle('hidden', !showScroll);
       bookShell.classList.toggle('hidden', showScroll);
 
-      if (showScroll) renderScroll();
-      else renderBook();
+      if (showScroll) {
+        renderScroll();
+      } else {
+        renderBook();
+      }
 
       updateButtons();
       updateThumbActive();
@@ -938,8 +896,8 @@
       document.body.classList.toggle('fullscreen-reading', !!document.fullscreenElement);
     }
 
-    // Events
     openFileBtn.addEventListener('click', () => fileInput.click());
+
     fileInput.addEventListener('change', async (e) => {
       await loadSelectedFiles(e.target.files);
       e.target.value = '';
@@ -966,12 +924,12 @@
     btnBook.addEventListener('click', () => setMode('book'));
     thumbToggleBtn.addEventListener('click', toggleThumbs);
     fsThumbBtn.addEventListener('click', toggleThumbs);
-    zoomOutBtn.addEventListener('click', () => zoomFromCenter(zoomLevel - 0.1, true));
-    zoomResetBtn.addEventListener('click', () => { zoomLocked = false; resetZoom(true); });
-    zoomInBtn.addEventListener('click', () => zoomFromCenter(zoomLevel + 0.1, true));
-    fsZoomOutBtn.addEventListener('click', () => zoomFromCenter(zoomLevel - 0.1, true));
-    fsZoomResetBtn.addEventListener('click', () => { zoomLocked = false; resetZoom(true); });
-    fsZoomInBtn.addEventListener('click', () => zoomFromCenter(zoomLevel + 0.1, true));
+    zoomOutBtn.addEventListener('click', zoomOut);
+    zoomResetBtn.addEventListener('click', resetZoom);
+    zoomInBtn.addEventListener('click', zoomIn);
+    fsZoomOutBtn.addEventListener('click', zoomOut);
+    fsZoomResetBtn.addEventListener('click', resetZoom);
+    fsZoomInBtn.addEventListener('click', zoomIn);
     fullscreenBtn.addEventListener('click', toggleFullscreen);
     fsExitBtn.addEventListener('click', toggleFullscreen);
 
@@ -989,144 +947,50 @@
       if (e.key === 'Home') firstPage();
       if (e.key === 'End') lastPage();
       if (e.key.toLowerCase() === 'f') toggleFullscreen();
-      if (e.key === '+' || e.key === '=') zoomFromCenter(zoomLevel + 0.1, true);
-      if (e.key === '-' || e.key === '_') zoomFromCenter(zoomLevel - 0.1, true);
-      if (e.key === '0') { zoomLocked = false; resetZoom(true); }
+      if (e.key === '+' || e.key === '=') zoomIn();
+      if (e.key === '-' || e.key === '_') zoomOut();
+      if (e.key === '0') resetZoom();
     });
 
     document.addEventListener('fullscreenchange', onFullscreenChanged);
 
-    reader.addEventListener('dblclick', () => {
-      if (!pages.length) return;
-      if (Math.abs(zoomLevel - 1) > 0.001) {
-        zoomLocked = false;
-        resetZoom(true);
-      }
-    });
+    // Simple swipe navigation for book mode only; no custom pinch zoom.
+    let touchStartX = 0;
+    let touchStartY = 0;
 
-    // Swipe and pinch
     reader.addEventListener('touchstart', (e) => {
-      if (!pages.length) return;
-
-      if (e.touches.length === 2) {
-        e.preventDefault();
-        reader.classList.add('pinching');
-        pinchActive = true;
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        pinchStartDistance = Math.hypot(dx, dy);
-        pinchStartZoom = zoomLevel;
-
-        const rect = reader.getBoundingClientRect();
-        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        pinchAnchorX = clamp(midX - rect.left, 0, rect.width);
-        pinchAnchorY = clamp(midY - rect.top, 0, rect.height);
-        pinchStartScrollLeft = reader.scrollLeft;
-        pinchStartScrollTop = reader.scrollTop;
-        suppressFullscreenTapUntil = Date.now() + 700;
-        return;
-      }
-
-      const t = e.changedTouches[0];
-      if (!t) return;
+      if (!pages.length || e.touches.length !== 1) return;
+      const t = e.touches[0];
       touchStartX = t.clientX;
       touchStartY = t.clientY;
-    }, { passive: false });
-
-    reader.addEventListener('touchmove', (e) => {
-      if (!pinchActive || e.touches.length !== 2) return;
-      e.preventDefault();
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const distance = Math.hypot(dx, dy);
-      if (!pinchStartDistance) return;
-      const ratio = distance / pinchStartDistance;
-      zoomPinch(pinchStartZoom * ratio);
-    }, { passive: false });
+    }, { passive: true });
 
     reader.addEventListener('touchend', (e) => {
-      reader.classList.remove('pinching');
-      if (!pages.length) return;
-      if (e.touches && e.touches.length >= 2) return;
-      if (pinchActive) {
-        pinchActive = false;
-        suppressFullscreenTapUntil = Date.now() + 700;
-        return;
-      }
-
-      const now = Date.now();
+      if (!pages.length || mode !== 'book') return;
       const t = e.changedTouches[0];
       if (!t) return;
       const dx = t.clientX - touchStartX;
       const dy = t.clientY - touchStartY;
-
-      if (Math.abs(dx) > 50 && Math.abs(dy) < 35 && mode === 'book') {
+      if (Math.abs(dx) > 50 && Math.abs(dy) < 35) {
         if (dx < 0) nextPage();
         else prevPage();
-        return;
-      }
-
-      if (now < suppressFullscreenTapUntil) {
-        tapLastTime = now;
-        return;
-      }
-
-      if (now - tapLastTime < 280) {
-        if (Math.abs(zoomLevel - 1) > 0.001) {
-          zoomLocked = false;
-          resetZoom(true);
-        }
-        tapLastTime = 0;
-      } else {
-        tapLastTime = now;
       }
     }, { passive: true });
 
-    reader.addEventListener('touchcancel', () => {
-      reader.classList.remove('pinching');
-      pinchActive = false;
-    }, { passive: true });
-
-    window.addEventListener('blur', () => {
-      reader.classList.remove('pinching');
-      pinchActive = false;
-    });
-
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        reader.classList.remove('pinching');
-        pinchActive = false;
-      }
-    });
-
-    reader.addEventListener('wheel', (e) => {
-      if (!e.ctrlKey && !e.metaKey) return;
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.08 : 0.08;
-      zoomFromCenter(zoomLevel + delta, true);
-    }, { passive: false });
-
-    // init
     updateOrientationState();
-    applyZoom();
+    applyPageZoom();
     setTheme(theme);
     setMode(mode);
     setThumbsOpen(thumbsOpen);
-    if (!zoomLocked) autoFitZoom();
     updateView();
 
     window.addEventListener('resize', () => {
-      const before = document.body.classList.contains('portrait');
       updateOrientationState();
-      const after = document.body.classList.contains('portrait');
-      if (!zoomLocked) autoFitZoom();
-      if (before !== after) updateView();
+      updateView();
     });
 
     window.addEventListener('orientationchange', () => {
       updateOrientationState();
-      if (!zoomLocked) autoFitZoom();
       updateView();
     });
   </script>
