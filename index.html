@@ -25,8 +25,6 @@
 
     * { box-sizing: border-box; }
 
-    /* FIX 1: html,body fixed height + overflow hidden + overscroll none
-       → ป้องกัน body scroll ไม่ให้ pull-to-refresh เกิดขึ้น */
     html, body {
       margin: 0; padding: 0;
       width: 100%; height: 100%;
@@ -35,13 +33,13 @@
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       overflow: hidden;
       overscroll-behavior: none;
+      /* บอก browser ว่าเราจัดการ pan+pinch เอง ทั้งหน้า */
+      touch-action: pan-x pan-y;
     }
 
     body.mobile { --reader-bg: #0b0d12; }
     body.pc     { --reader-bg: #131722; }
 
-    /* FIX 2: .app ใช้ height แทน min-height + overflow hidden
-       → app ไม่โตเกิน viewport ป้องกัน body ต้อง scroll */
     .app {
       display: flex; flex-direction: column;
       height: 100vh; height: 100dvh;
@@ -67,9 +65,11 @@
       background: #202635; color: var(--text);
       border: 1px solid var(--border);
       border-radius: 10px; padding: 10px 12px; font-size: 14px;
+      /* ปุ่มแยก touch-action เฉพาะ manipulation (tap, no zoom) */
+      touch-action: manipulation;
     }
 
-    button { cursor: pointer; touch-action: manipulation; }
+    button { cursor: pointer; }
 
     button.active {
       background: var(--accent); color: #05101c;
@@ -97,9 +97,6 @@
       background: rgba(90,169,255,.08);
     }
 
-    /* FIX 3: reader ต้องมี min-height: 0 เพื่อให้ flex shrink ได้จริง
-       + overscroll-behavior: none ป้องกัน pull-to-refresh บน reader
-       + touch-action: pan-y ป้องกัน Chrome Android pull-to-refresh */
     .reader {
       flex: 1;
       overflow: auto;
@@ -109,7 +106,9 @@
       overscroll-behavior: none;
       -webkit-overflow-scrolling: touch;
       overflow-anchor: none;
-      touch-action: pan-y pan-x;
+      /* pan-x pan-y: single-touch scroll ปกติ
+         browser จะไม่ทำ native pinch-zoom (เราทำเองผ่าน document handler) */
+      touch-action: pan-x pan-y;
     }
 
     .scroll-view {
@@ -188,8 +187,6 @@
 
     .hidden { display: none !important; }
 
-    /* FIX 4: thumb-panel เพิ่ม overscroll-behavior: contain
-       → เลื่อน thumb เร็วจะไม่กระชาก body */
     .thumb-panel {
       position: fixed;
       top: var(--topbar-h); right: 0;
@@ -203,6 +200,7 @@
       z-index: 28;
       overflow-y: auto;
       overscroll-behavior: contain;
+      touch-action: pan-y;
       padding: 8px;
       box-shadow: -8px 0 24px rgba(0,0,0,.22);
     }
@@ -374,6 +372,99 @@
     if (thumbsOpen === null) thumbsOpen = (theme === 'pc') ? '1' : '0';
     thumbsOpen = thumbsOpen === '1';
 
+    /* ══════════════════════════════════════════════════════════════════════
+     * PINCH-TO-ZOOM — Document level (ทำงานทุกที่บนหน้า ไม่ใช่แค่ reader)
+     *
+     * หลักการ:
+     *  • จับ touchstart/move/end ที่ document เพื่อดักทุก 2-finger gesture
+     *  • เมื่อตรวจพบ 2 นิ้ว → คำนวณ zoom = zoom0 × (dist_ใหม่ / dist_เดิม)
+     *  • เซ็ต --scroll-scale ทันทีทุก touchmove frame → ไม่มี sticky / snap
+     *  • ปรับ reader.scrollTop/Left ให้จุดใต้นิ้วคงตำแหน่งเดิมบนจอ
+     *  • preventDefault() บน touchmove 2 นิ้ว → ป้องกัน browser native zoom
+     *    และ pull-to-refresh ระหว่าง pinch
+     *  • single-touch ไม่ถูกแตะ → scroll ปกติ
+     * ════════════════════════════════════════════════════════════════════*/
+
+    let pinchActive   = false;
+    let pinchDist0    = 0;
+    let pinchZoom0    = 1;
+    let pinchMidX     = 0;   // จุดกึ่งกลางนิ้วบน screen ตอน pinch เริ่ม
+    let pinchMidY     = 0;
+    let pinchScrollX0 = 0;   // reader.scrollLeft ตอน pinch เริ่ม
+    let pinchScrollY0 = 0;   // reader.scrollTop  ตอน pinch เริ่ม
+
+    function ptDist(t1, t2) {
+      return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+    }
+
+    // รีเซ็ต pinch state จาก touches ปัจจุบัน (ใช้ทั้งตอน start และตอนนิ้วที่ 2 เพิ่มเข้ามา)
+    function initPinch(touches) {
+      pinchActive   = true;
+      pinchDist0    = ptDist(touches[0], touches[1]);
+      pinchZoom0    = pageZoom;
+      pinchMidX     = (touches[0].clientX + touches[1].clientX) / 2;
+      pinchMidY     = (touches[0].clientY + touches[1].clientY) / 2;
+      // อ่าน scroll จาก reader เสมอ (ใช้เป็น anchor ของเนื้อหา)
+      pinchScrollX0 = reader.scrollLeft;
+      pinchScrollY0 = reader.scrollTop;
+    }
+
+    // touchstart: จับ 2 นิ้วได้ที่ไหนก็ได้บนหน้า
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) initPinch(e.touches);
+      // ถ้านิ้วที่ 3 ขึ้นมา ยกเลิก pinch
+      if (e.touches.length > 2) pinchActive = false;
+    }, { passive: true });
+
+    // touchmove: non-passive เพื่อเรียก preventDefault ได้
+    document.addEventListener('touchmove', (e) => {
+      // ไม่ใช่ pinch → ปล่อยให้ browser จัดการ scroll ปกติ
+      if (!pinchActive || e.touches.length < 2) return;
+
+      // หยุด native pinch-zoom ของ browser และ pull-to-refresh
+      e.preventDefault();
+
+      const newDist = ptDist(e.touches[0], e.touches[1]);
+      if (pinchDist0 < 1) return;
+
+      // zoom ใหม่ = zoom เดิม × อัตราส่วนระยะนิ้ว (ต่อเนื่อง ไม่ snap)
+      const rawZoom = pinchZoom0 * (newDist / pinchDist0);
+      const newZoom = clamp(rawZoom, 0.25, 4);
+
+      // อัปเดต CSS variable ทันที
+      pageZoom = newZoom;
+      applyPageZoom();
+
+      // บังคับ synchronous layout เพื่ออ่าน scrollHeight/Width ที่อัปเดตแล้ว
+      const newH  = reader.scrollHeight;
+      const newW  = reader.scrollWidth;
+      const cH    = reader.clientHeight;
+      const cW    = reader.clientWidth;
+
+      // คำนวณ scroll ใหม่เพื่อให้จุดเนื้อหาที่อยู่ใต้จุดกึ่งกลางนิ้ว
+      // ยังคงอยู่ที่ตำแหน่งเดิมบนหน้าจอหลัง zoom
+      // anchor (เนื้อหา) = scroll0 + mid_screen
+      // หลัง zoom anchor อยู่ที่ anchor × ratio ใน content-space ใหม่
+      // ต้องการให้ anchor อยู่ที่ midX/midY บนหน้าจอ → scrollNew = anchor×ratio − mid
+      const ratio   = newZoom / pinchZoom0;
+      const anchorX = pinchScrollX0 + pinchMidX;
+      const anchorY = pinchScrollY0 + pinchMidY;
+
+      reader.scrollLeft = clamp(anchorX * ratio - pinchMidX, 0, Math.max(0, newW - cW));
+      reader.scrollTop  = clamp(anchorY * ratio - pinchMidY, 0, Math.max(0, newH - cH));
+    }, { passive: false });
+
+    // touchend: ถ้าเหลือนิ้วน้อยกว่า 2 → จบ pinch
+    document.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) pinchActive = false;
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', () => {
+      pinchActive = false;
+    }, { passive: true });
+
+    /* ════════════════════════════════════════════════════════════════════*/
+
     function isIOS() {
       return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -417,16 +508,16 @@
     }
 
     function applyPageZoom() {
-      pageZoom = clamp(pageZoom, 0.25, 2.5);
+      pageZoom = clamp(pageZoom, 0.25, 4);
       document.documentElement.style.setProperty('--scroll-scale', pageZoom);
       localStorage.setItem('cbz_page_zoom', String(pageZoom));
       const pct = Math.round(pageZoom * 100);
-      zoomResetBtn.textContent  = `${pct}%`;
+      zoomResetBtn.textContent   = `${pct}%`;
       fsZoomResetBtn.textContent = `${pct}%`;
     }
 
     function setPageZoom(nextZoom) {
-      const newZoom = clamp(Number(nextZoom) || 1, 0.25, 2.5);
+      const newZoom = clamp(Number(nextZoom) || 1, 0.25, 4);
       if (Math.abs(newZoom - pageZoom) < 0.0001) return;
 
       const ratio   = newZoom / pageZoom;
@@ -444,8 +535,8 @@
       const newH = reader.scrollHeight;
       const newW = reader.scrollWidth;
 
-      reader.scrollTop  = Math.min(Math.max(0, anchorY * ratio - clientH / 2), Math.max(0, newH - clientH));
-      reader.scrollLeft = Math.min(Math.max(0, anchorX * ratio - clientW / 2), Math.max(0, newW - clientW));
+      reader.scrollTop  = clamp(anchorY * ratio - clientH / 2, 0, Math.max(0, newH - clientH));
+      reader.scrollLeft = clamp(anchorX * ratio - clientW / 2, 0, Math.max(0, newW - clientW));
     }
 
     function zoomIn()    { setPageZoom(pageZoom + 0.1); }
@@ -556,9 +647,7 @@
 
     function renderScroll() {
       if (scrollView.childElementCount !== pages.length) {
-        // FIX 5: บันทึก scroll position ก่อน rebuild แล้ว restore หลัง
-        // ป้องกัน scroll กระโดดไปหน้าแรกเมื่อ DOM ถูก rebuild
-        const savedScrollTop  = reader.scrollTop;
+        const savedScrollTop   = reader.scrollTop;
         const prevScrollHeight = reader.scrollHeight;
 
         scrollView.innerHTML = '';
@@ -572,7 +661,6 @@
           scrollView.appendChild(wrap);
         }
 
-        // Restore scroll proportionally หลัง layout ใหม่
         if (prevScrollHeight > 0 && savedScrollTop > 0) {
           requestAnimationFrame(() => {
             reader.scrollTop = (savedScrollTop / prevScrollHeight) * reader.scrollHeight;
@@ -662,10 +750,7 @@
       updateView(); syncScrollToCurrent();
     }
 
-    function firstPage() {
-      currentIndex = 0; updateView(); syncScrollToCurrent();
-    }
-
+    function firstPage() { currentIndex = 0; updateView(); syncScrollToCurrent(); }
     function lastPage() {
       currentIndex = getMaxStartIndex();
       if (isSpreadView()) normalizeSpreadIndex();
@@ -745,13 +830,15 @@
 
     document.addEventListener('fullscreenchange', onFullscreenChanged);
 
+    /* ── Book mode swipe (1 นิ้วใน reader เท่านั้น) ── */
     let touchStartX = 0, touchStartY = 0;
     reader.addEventListener('touchstart', (e) => {
-      if (!pages.length || mode !== 'book' || e.touches.length !== 1) return;
+      // ไม่รับถ้ากำลัง pinch อยู่ หรือนิ้วมากกว่า 1
+      if (!pages.length || mode !== 'book' || e.touches.length !== 1 || pinchActive) return;
       touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
     }, { passive: true });
     reader.addEventListener('touchend', (e) => {
-      if (!pages.length || mode !== 'book') return;
+      if (!pages.length || mode !== 'book' || pinchActive) return;
       const t = e.changedTouches[0]; if (!t) return;
       const dx = t.clientX - touchStartX, dy = t.clientY - touchStartY;
       if (Math.abs(dx) > 50 && Math.abs(dy) < 35) { dx < 0 ? nextPage() : prevPage(); }
@@ -765,9 +852,6 @@
     setThumbsOpen(thumbsOpen);
     updateView();
 
-    // FIX 6: debounce resize ด้วย rAF
-    // address bar บน mobile ซ่อน/แสดงระหว่าง scroll → ยิง resize event
-    // ถ้าไม่ debounce จะเรียก updateView() ซ้ำหลายครั้งต่อวินาที
     let resizeRaf = null;
     window.addEventListener('resize', () => {
       if (resizeRaf) cancelAnimationFrame(resizeRaf);
@@ -778,7 +862,6 @@
       });
     });
 
-    // orientationchange ต้องรอ 100ms ให้ browser ปรับ layout ก่อน
     window.addEventListener('orientationchange', () => {
       setTimeout(() => { updateOrientationState(); updateView(); }, 100);
     });
