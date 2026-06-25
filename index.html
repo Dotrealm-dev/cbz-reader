@@ -6,276 +6,175 @@
   <title>CBZ Reader Local</title>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 
   <style>
     :root {
-      --bg: #0f1115;
-      --panel: #171a21;
-      --text: #e8eaf0;
-      --muted: #9aa3b2;
-      --accent: #5aa9ff;
-      --border: #2a3140;
-      --shadow: rgba(0, 0, 0, .35);
-      --reader-bg: #111318;
-      --page-bg: #ffffff;
-      --thumb-w: 112px;
-      --topbar-h: 62px;
-      --scroll-scale: 1;
+      --bg: #0f1115; --panel: #171a21; --text: #e8eaf0; --muted: #9aa3b2;
+      --accent: #5aa9ff; --border: #2a3140; --shadow: rgba(0,0,0,.35);
+      --reader-bg: #111318; --page-bg: #ffffff;
+      --thumb-w: 112px; --topbar-h: 62px; --scroll-scale: 1;
     }
-
     * { box-sizing: border-box; }
-
     html, body {
-      margin: 0; padding: 0;
-      width: 100%; height: 100%;
-      background: var(--bg);
-      color: var(--text);
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: var(--bg); color: var(--text);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      overflow: hidden;
-      overscroll-behavior: none;
-      touch-action: pan-x pan-y;
+      overflow: hidden; overscroll-behavior: none; touch-action: pan-x pan-y;
     }
-
     body.mobile { --reader-bg: #0b0d12; }
     body.pc     { --reader-bg: #131722; }
-
     .app {
       display: flex; flex-direction: column;
       height: 100vh; height: 100dvh;
-      width: 100%; position: relative;
-      overflow: hidden;
+      width: 100%; position: relative; overflow: hidden;
     }
-
     .topbar {
       display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-      padding: 10px;
-      background: var(--panel);
+      padding: 10px; background: var(--panel);
       border-bottom: 1px solid var(--border);
       box-shadow: 0 2px 10px var(--shadow);
-      z-index: 30;
-      min-height: var(--topbar-h);
-      position: sticky; top: 0;
-      flex-shrink: 0;
+      z-index: 30; min-height: var(--topbar-h);
+      position: sticky; top: 0; flex-shrink: 0;
     }
-
     .topbar .group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-
     button, input[type="file"] {
       background: #202635; color: var(--text);
       border: 1px solid var(--border);
       border-radius: 10px; padding: 10px 12px; font-size: 14px;
       touch-action: manipulation;
     }
-
     button { cursor: pointer; }
-
-    button.active {
-      background: var(--accent); color: #05101c;
-      border-color: transparent; font-weight: 700;
-    }
-
+    button.active { background: var(--accent); color: #05101c; border-color: transparent; font-weight: 700; }
     button:disabled { opacity: .5; cursor: not-allowed; }
-
     .status {
-      color: var(--muted); font-size: 13px;
-      margin-left: auto; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis; max-width: 44vw;
+      color: var(--muted); font-size: 13px; margin-left: auto;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 44vw;
     }
-
     .dropzone {
       margin: 10px; padding: 16px;
       border: 2px dashed var(--border); border-radius: 16px;
       background: rgba(255,255,255,.02);
-      color: var(--muted); text-align: center; user-select: none;
-      flex-shrink: 0;
+      color: var(--muted); text-align: center; user-select: none; flex-shrink: 0;
     }
-
-    .dropzone.dragover {
-      border-color: var(--accent); color: var(--text);
-      background: rgba(90,169,255,.08);
-    }
-
+    .dropzone.dragover { border-color: var(--accent); color: var(--text); background: rgba(90,169,255,.08); }
     .reader {
-      flex: 1;
-      overflow: auto;
-      min-height: 0;
-      background: var(--reader-bg);
-      position: relative;
-      overscroll-behavior: none;
-      -webkit-overflow-scrolling: touch;
-      overflow-anchor: none;
-      touch-action: pan-x pan-y;
+      flex: 1; overflow: auto; min-height: 0;
+      background: var(--reader-bg); position: relative;
+      overscroll-behavior: none; -webkit-overflow-scrolling: touch;
+      overflow-anchor: none; touch-action: pan-x pan-y;
     }
-
     .scroll-view {
-      width: 100%;
-      display: flex; flex-direction: column; align-items: center;
-      gap: 0; padding: 0; margin: 0;
-      overflow-anchor: none;
+      width: 100%; display: flex; flex-direction: column; align-items: center;
+      gap: 0; padding: 0; margin: 0; overflow-anchor: none;
     }
-
     .scroll-page {
       width: calc(100% * var(--scroll-scale));
-      display: block; line-height: 0;
-      margin: 0 auto; padding: 0; overflow: hidden;
+      display: block; line-height: 0; margin: 0 auto; padding: 0; overflow: hidden;
     }
-
     .scroll-page img {
       display: block; width: 100%; height: auto;
       margin: 0 auto; border: none; border-radius: 0; box-shadow: none;
-      background: #fff;
-      user-select: none; -webkit-user-drag: none; pointer-events: none;
+      background: #fff; user-select: none; -webkit-user-drag: none; pointer-events: none;
     }
+    /* PDF loading progress bar */
+    .pdf-progress {
+      position: sticky; top: 0; z-index: 5;
+      width: 100%; height: 3px; background: var(--border);
+    }
+    .pdf-progress-bar {
+      height: 100%; background: var(--accent);
+      transition: width .2s ease; width: 0%;
+    }
+    .pdf-progress.done { display: none; }
 
-    /* ── Invert: กลับสีเฉพาะภาพมังงะ ──────────────────────────────────
-       ใช้ filter: invert(1) กับภาพโดยตรง
-       → ขาว→ดำ ดำ→ขาว  UI อื่น (topbar / panel) ไม่ถูกกระทบ        */
+    /* Invert */
     body.inverted .scroll-page img,
     body.inverted .page img,
-    body.inverted .single-page img {
-      filter: invert(1);
-    }
-    /* ──────────────────────────────────────────────────────────────────*/
+    body.inverted .single-page img { filter: invert(1); }
+    body.inverted .page { background: #000; }
 
-    .book-shell {
-      position: absolute; inset: 0;
-      display: grid; place-items: center; padding: 16px;
-    }
-
+    .book-shell { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; }
     .book {
-      position: relative;
-      width: min(92vw, 1200px); height: min(88vh, 900px);
+      position: relative; width: min(92vw, 1200px); height: min(88vh, 900px);
       display: flex; justify-content: center; align-items: center;
     }
-
     .spread {
       position: relative; width: 100%; height: 100%;
       display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
     }
-
     .page {
       position: relative; background: var(--page-bg);
       border-radius: 12px; overflow: hidden;
       box-shadow: 0 12px 40px var(--shadow);
       display: flex; align-items: center; justify-content: center;
     }
-
-    /* เมื่อ invert ให้พื้นหลัง page เปลี่ยนเป็นดำด้วย */
-    body.inverted .page,
-    body.inverted .single-page img { background: #000; }
-
     .page img {
-      width: 100%; height: 100%; object-fit: contain;
-      display: block; background: #fff;
-      user-select: none; -webkit-user-drag: none; pointer-events: none;
+      width: 100%; height: 100%; object-fit: contain; display: block;
+      background: #fff; user-select: none; -webkit-user-drag: none; pointer-events: none;
     }
-
     .single-page { width: 100%; height: 100%; display: none; }
-
     .single-page img {
-      width: 100%; height: 100%; object-fit: contain;
-      background: #fff;
-      box-shadow: 0 12px 40px var(--shadow);
-      border-radius: 12px;
+      width: 100%; height: 100%; object-fit: contain; background: #fff;
+      box-shadow: 0 12px 40px var(--shadow); border-radius: 12px;
       user-select: none; -webkit-user-drag: none; pointer-events: none;
     }
-
     .nav-bottom {
       position: absolute; left: 0; right: 0; bottom: 12px;
       display: flex; justify-content: center; gap: 10px;
       pointer-events: none; z-index: 12;
     }
-
     .nav-bottom .navbtn { pointer-events: auto; backdrop-filter: blur(8px); }
-
     .page-counter {
       position: absolute; top: 12px; right: 12px;
       background: rgba(0,0,0,.55); color: white;
       padding: 8px 10px; border-radius: 999px;
       font-size: 13px; z-index: 13; pointer-events: none;
     }
-
     .hidden { display: none !important; }
-
     .thumb-panel {
-      position: fixed;
-      top: var(--topbar-h); right: 0;
+      position: fixed; top: var(--topbar-h); right: 0;
       width: var(--thumb-w);
-      height: calc(100vh - var(--topbar-h));
-      height: calc(100dvh - var(--topbar-h));
-      background: rgba(12,14,20,.96);
-      border-left: 1px solid var(--border);
-      transform: translateX(100%);
-      transition: transform .18s ease;
-      z-index: 28;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      touch-action: pan-y;
-      padding: 8px;
-      box-shadow: -8px 0 24px rgba(0,0,0,.22);
+      height: calc(100vh - var(--topbar-h)); height: calc(100dvh - var(--topbar-h));
+      background: rgba(12,14,20,.96); border-left: 1px solid var(--border);
+      transform: translateX(100%); transition: transform .18s ease;
+      z-index: 28; overflow-y: auto; overscroll-behavior: contain;
+      touch-action: pan-y; padding: 8px; box-shadow: -8px 0 24px rgba(0,0,0,.22);
     }
-
     body.fullscreen-reading .thumb-panel { top: 0; height: 100vh; height: 100dvh; }
     body.thumbs-open .thumb-panel { transform: translateX(0); }
-
     .thumb-item {
-      width: 100%; padding: 0;
-      border: 2px solid transparent;
-      border-radius: 10px; overflow: hidden;
-      margin-bottom: 8px; background: #1b2130; line-height: 0;
+      width: 100%; padding: 0; border: 2px solid transparent;
+      border-radius: 10px; overflow: hidden; margin-bottom: 8px;
+      background: #1b2130; line-height: 0;
     }
-
     .thumb-item.active { border-color: var(--accent); }
-
     .thumb-item img {
-      width: 100%; display: block;
-      object-fit: cover; aspect-ratio: 3/4;
-      background: #fff;
-      user-select: none; -webkit-user-drag: none; pointer-events: none;
+      width: 100%; display: block; object-fit: cover; aspect-ratio: 3/4;
+      background: #fff; user-select: none; -webkit-user-drag: none; pointer-events: none;
     }
-
-    /* ── Fullscreen tools: column layout เรียงจากบนลงล่าง
-       Exit อยู่ล่างสุด, Invert อยู่เหนือ Exit ── */
     .fullscreen-tools {
       position: fixed; right: 12px; bottom: 12px;
-      display: none;
-      flex-direction: column;
-      gap: 8px;
-      align-items: flex-end;
-      z-index: 40;
+      display: none; flex-direction: column; gap: 8px; align-items: flex-end; z-index: 40;
     }
-
     body.fullscreen-reading .fullscreen-tools { display: flex; }
-
-    :fullscreen .topbar,
-    body.fullscreen-reading .topbar { display: none !important; }
-
-    :fullscreen .dropzone,
-    body.fullscreen-reading .dropzone { display: none !important; }
-
-    :fullscreen .reader,
-    body.fullscreen-reading .reader { height: 100vh !important; height: 100dvh !important; }
-
+    :fullscreen .topbar, body.fullscreen-reading .topbar { display: none !important; }
+    :fullscreen .dropzone, body.fullscreen-reading .dropzone { display: none !important; }
+    :fullscreen .reader, body.fullscreen-reading .reader { height: 100vh !important; height: 100dvh !important; }
     body.fullscreen-reading .app { height: 100vh; height: 100dvh; }
-
     body.mobile .book {
       width: min(100vw, 100%);
-      height: calc(100vh - var(--topbar-h));
-      height: calc(100dvh - var(--topbar-h));
+      height: calc(100vh - var(--topbar-h)); height: calc(100dvh - var(--topbar-h));
     }
-
     body.fullscreen-reading .book { width: 100vw; height: 100vh; height: 100dvh; }
-
-    body.mobile.portrait .spread  { display: none; }
+    body.mobile.portrait .spread { display: none; }
     body.mobile.portrait .single-page { display: block; }
     body.mobile.landscape .spread { display: grid; }
     body.mobile.landscape .single-page { display: none; }
-    body.pc .spread     { display: grid; }
+    body.pc .spread { display: grid; }
     body.pc .single-page { display: none; }
     body.pc .book { width: min(96vw, 1400px); height: min(90vh, 980px); }
-
     @media (max-width: 900px) { .status { max-width: 100%; margin-left: 0; } }
-
     @media (max-width: 700px) {
       :root { --thumb-w: 96px; }
       .topbar { gap: 6px; }
@@ -288,7 +187,7 @@
   <div class="app">
     <div class="topbar">
       <div class="group">
-        <input id="fileInput" type="file" multiple />
+        <input id="fileInput" type="file" multiple accept=".cbz,.zip,.pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif" />
         <button id="openFileBtn">Open</button>
         <button id="btnMobile" class="active">Mobile</button>
         <button id="btnPc">PC</button>
@@ -307,12 +206,17 @@
         <button id="firstBtn" disabled>First</button>
         <button id="lastBtn" disabled>Last</button>
       </div>
-      <div class="status" id="status">เลือกไฟล์ CBZ/ZIP หรือรูปภาพ</div>
+      <div class="status" id="status">เลือกไฟล์ CBZ / ZIP / PDF หรือรูปภาพ</div>
     </div>
 
-    <div id="dropzone" class="dropzone">ลากไฟล์ .cbz, .zip หรือรูปภาพมาวางตรงนี้</div>
+    <div id="dropzone" class="dropzone">ลากไฟล์ .cbz, .zip, .pdf หรือรูปภาพมาวางตรงนี้</div>
 
     <div id="reader" class="reader scroll">
+      <!-- PDF progress bar (แสดงระหว่างแปลง) -->
+      <div id="pdfProgressWrap" class="pdf-progress done">
+        <div id="pdfProgressBar" class="pdf-progress-bar"></div>
+      </div>
+
       <div id="scrollView" class="scroll-view hidden"></div>
 
       <div id="bookShell" class="book-shell hidden">
@@ -322,9 +226,7 @@
             <div class="page"><img id="leftPage" alt="left page"></div>
             <div class="page"><img id="rightPage" alt="right page"></div>
           </div>
-          <div class="single-page">
-            <img id="singlePage" alt="single page">
-          </div>
+          <div class="single-page"><img id="singlePage" alt="single page"></div>
           <div class="nav-bottom">
             <button class="navbtn" id="bookPrev">◀</button>
             <button class="navbtn" id="bookNext">▶</button>
@@ -335,73 +237,82 @@
 
     <div id="thumbPanel" class="thumb-panel hidden"></div>
 
-    <!-- fullscreen-tools: column layout, Exit อยู่ล่างสุด -->
     <div class="fullscreen-tools">
       <button id="fsThumbBtn">Thumbs</button>
       <button id="fsZoomOutBtn">－</button>
       <button id="fsZoomResetBtn">100%</button>
       <button id="fsZoomInBtn">＋</button>
-      <button id="fsInvertBtn">☀︎</button>   <!-- Invert: อยู่เหนือ Exit -->
+      <button id="fsInvertBtn">☀︎</button>
       <button id="fsExitBtn">Exit</button>
     </div>
   </div>
 
   <script>
-    const fileInput      = document.getElementById('fileInput');
-    const openFileBtn    = document.getElementById('openFileBtn');
-    const dropzone       = document.getElementById('dropzone');
-    const reader         = document.getElementById('reader');
-    const scrollView     = document.getElementById('scrollView');
-    const bookShell      = document.getElementById('bookShell');
-    const statusEl       = document.getElementById('status');
-    const btnMobile      = document.getElementById('btnMobile');
-    const btnPc          = document.getElementById('btnPc');
-    const btnScroll      = document.getElementById('btnScroll');
-    const btnBook        = document.getElementById('btnBook');
-    const thumbToggleBtn = document.getElementById('thumbToggleBtn');
-    const zoomOutBtn     = document.getElementById('zoomOutBtn');
-    const zoomResetBtn   = document.getElementById('zoomResetBtn');
-    const zoomInBtn      = document.getElementById('zoomInBtn');
-    const invertBtn      = document.getElementById('invertBtn');
-    const fullscreenBtn  = document.getElementById('fullscreenBtn');
-    const fsThumbBtn     = document.getElementById('fsThumbBtn');
-    const fsZoomOutBtn   = document.getElementById('fsZoomOutBtn');
-    const fsZoomResetBtn = document.getElementById('fsZoomResetBtn');
-    const fsZoomInBtn    = document.getElementById('fsZoomInBtn');
-    const fsInvertBtn    = document.getElementById('fsInvertBtn');
-    const fsExitBtn      = document.getElementById('fsExitBtn');
-    const prevBtn        = document.getElementById('prevBtn');
-    const nextBtn        = document.getElementById('nextBtn');
-    const firstBtn       = document.getElementById('firstBtn');
-    const lastBtn        = document.getElementById('lastBtn');
-    const bookPrev       = document.getElementById('bookPrev');
-    const bookNext       = document.getElementById('bookNext');
-    const leftPage       = document.getElementById('leftPage');
-    const rightPage      = document.getElementById('rightPage');
-    const singlePage     = document.getElementById('singlePage');
-    const pageCounter    = document.getElementById('pageCounter');
-    const thumbPanel     = document.getElementById('thumbPanel');
+    /* ── PDF.js worker setup ─────────────────────────────────────────── */
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    }
 
+    /* ── DOM refs ────────────────────────────────────────────────────── */
+    const fileInput       = document.getElementById('fileInput');
+    const openFileBtn     = document.getElementById('openFileBtn');
+    const dropzone        = document.getElementById('dropzone');
+    const reader          = document.getElementById('reader');
+    const scrollView      = document.getElementById('scrollView');
+    const bookShell       = document.getElementById('bookShell');
+    const statusEl        = document.getElementById('status');
+    const btnMobile       = document.getElementById('btnMobile');
+    const btnPc           = document.getElementById('btnPc');
+    const btnScroll       = document.getElementById('btnScroll');
+    const btnBook         = document.getElementById('btnBook');
+    const thumbToggleBtn  = document.getElementById('thumbToggleBtn');
+    const zoomOutBtn      = document.getElementById('zoomOutBtn');
+    const zoomResetBtn    = document.getElementById('zoomResetBtn');
+    const zoomInBtn       = document.getElementById('zoomInBtn');
+    const invertBtn       = document.getElementById('invertBtn');
+    const fullscreenBtn   = document.getElementById('fullscreenBtn');
+    const fsThumbBtn      = document.getElementById('fsThumbBtn');
+    const fsZoomOutBtn    = document.getElementById('fsZoomOutBtn');
+    const fsZoomResetBtn  = document.getElementById('fsZoomResetBtn');
+    const fsZoomInBtn     = document.getElementById('fsZoomInBtn');
+    const fsInvertBtn     = document.getElementById('fsInvertBtn');
+    const fsExitBtn       = document.getElementById('fsExitBtn');
+    const prevBtn         = document.getElementById('prevBtn');
+    const nextBtn         = document.getElementById('nextBtn');
+    const firstBtn        = document.getElementById('firstBtn');
+    const lastBtn         = document.getElementById('lastBtn');
+    const bookPrev        = document.getElementById('bookPrev');
+    const bookNext        = document.getElementById('bookNext');
+    const leftPage        = document.getElementById('leftPage');
+    const rightPage       = document.getElementById('rightPage');
+    const singlePage      = document.getElementById('singlePage');
+    const pageCounter     = document.getElementById('pageCounter');
+    const thumbPanel      = document.getElementById('thumbPanel');
+    const pdfProgressWrap = document.getElementById('pdfProgressWrap');
+    const pdfProgressBar  = document.getElementById('pdfProgressBar');
+
+    /* ── State ───────────────────────────────────────────────────────── */
     let pages        = [];
     let currentIndex = 0;
-    let theme        = localStorage.getItem('cbz_theme') || 'mobile';
-    let mode         = localStorage.getItem('cbz_mode')  || 'scroll';
+    let theme        = localStorage.getItem('cbz_theme')  || 'mobile';
+    let mode         = localStorage.getItem('cbz_mode')   || 'scroll';
     let thumbsOpen   = localStorage.getItem('cbz_thumbs');
     let pageZoom     = Number(localStorage.getItem('cbz_page_zoom') || '1');
     let invertColors = localStorage.getItem('cbz_invert') === '1';
     let busy         = false;
+    let pdfLoading   = false; // ป้องกัน load ซ้อน
 
     if (thumbsOpen === null) thumbsOpen = (theme === 'pc') ? '1' : '0';
     thumbsOpen = thumbsOpen === '1';
 
-    /* ── Pinch-to-zoom (document level) ────────────────────────────────*/
+    /* ── Pinch-to-zoom (document level) ─────────────────────────────── */
     let pinchActive = false, pinchDist0 = 0, pinchZoom0 = 1;
     let pinchMidX = 0, pinchMidY = 0, pinchScrollX0 = 0, pinchScrollY0 = 0;
 
     function ptDist(t1, t2) {
       return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     }
-
     function initPinch(touches) {
       pinchActive   = true;
       pinchDist0    = ptDist(touches[0], touches[1]);
@@ -411,170 +322,145 @@
       pinchScrollX0 = reader.scrollLeft;
       pinchScrollY0 = reader.scrollTop;
     }
-
     document.addEventListener('touchstart', (e) => {
       if (e.touches.length === 2) initPinch(e.touches);
       if (e.touches.length > 2)  pinchActive = false;
     }, { passive: true });
-
     document.addEventListener('touchmove', (e) => {
       if (!pinchActive || e.touches.length < 2) return;
       e.preventDefault();
-      const newDist = ptDist(e.touches[0], e.touches[1]);
+      const d = ptDist(e.touches[0], e.touches[1]);
       if (pinchDist0 < 1) return;
-      const newZoom = clamp(pinchZoom0 * (newDist / pinchDist0), 0.25, 4);
-      pageZoom = newZoom;
-      applyPageZoom();
-      const newH = reader.scrollHeight, newW = reader.scrollWidth;
-      const cH   = reader.clientHeight, cW   = reader.clientWidth;
-      const ratio = newZoom / pinchZoom0;
-      reader.scrollLeft = clamp(
-        (pinchScrollX0 + pinchMidX) * ratio - pinchMidX, 0, Math.max(0, newW - cW));
-      reader.scrollTop  = clamp(
-        (pinchScrollY0 + pinchMidY) * ratio - pinchMidY, 0, Math.max(0, newH - cH));
+      const nz = clamp(pinchZoom0 * (d / pinchDist0), 0.25, 4);
+      pageZoom = nz; applyPageZoom();
+      const nH = reader.scrollHeight, nW = reader.scrollWidth;
+      const cH = reader.clientHeight, cW = reader.clientWidth;
+      const r  = nz / pinchZoom0;
+      reader.scrollLeft = clamp((pinchScrollX0 + pinchMidX) * r - pinchMidX, 0, Math.max(0, nW - cW));
+      reader.scrollTop  = clamp((pinchScrollY0 + pinchMidY) * r - pinchMidY, 0, Math.max(0, nH - cH));
     }, { passive: false });
-
-    document.addEventListener('touchend',   (e) => { if (e.touches.length < 2) pinchActive = false; }, { passive: true });
+    document.addEventListener('touchend',    (e) => { if (e.touches.length < 2) pinchActive = false; }, { passive: true });
     document.addEventListener('touchcancel', ()  => { pinchActive = false; },                           { passive: true });
-    /* ──────────────────────────────────────────────────────────────────*/
 
+    /* ── Helpers ─────────────────────────────────────────────────────── */
     function isIOS() {
       return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     }
-
+    function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
     function setStatus(msg) { statusEl.textContent = msg; }
-    function isImageFile(name) { return /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(name); }
-    function isZipFile(name)   { return /\.(cbz|zip)$/i.test(name); }
-
+    function isImageFile(n) { return /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(n); }
+    function isZipFile(n)   { return /\.(cbz|zip)$/i.test(n); }
+    function isPdfFile(n)   { return /\.pdf$/i.test(n); }
     function naturalSort(a, b) {
       return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
     }
 
-    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
-
     function updateOrientationState() {
       const portrait = window.matchMedia('(orientation: portrait)').matches || window.innerHeight >= window.innerWidth;
-      document.body.classList.toggle('portrait', portrait);
+      document.body.classList.toggle('portrait',  portrait);
       document.body.classList.toggle('landscape', !portrait);
     }
-
     function isSpreadView() {
       return mode === 'book' && (theme === 'pc' || document.body.classList.contains('landscape'));
     }
-
     function getBookStep() { return isSpreadView() ? 2 : 1; }
-
     function getMaxStartIndex() {
       if (!pages.length) return 0;
       if (!isSpreadView()) return pages.length - 1;
       if (pages.length <= 1) return 0;
       return (pages.length % 2 === 0) ? pages.length - 2 : pages.length - 1;
     }
-
     function normalizeSpreadIndex() {
       if (!isSpreadView()) return;
       if (currentIndex % 2 === 1) currentIndex -= 1;
-      if (currentIndex < 0) currentIndex = 0;
-      if (currentIndex > getMaxStartIndex()) currentIndex = getMaxStartIndex();
+      currentIndex = clamp(currentIndex, 0, getMaxStartIndex());
     }
 
+    /* ── Zoom ────────────────────────────────────────────────────────── */
     function applyPageZoom() {
       pageZoom = clamp(pageZoom, 0.25, 4);
       document.documentElement.style.setProperty('--scroll-scale', pageZoom);
       localStorage.setItem('cbz_page_zoom', String(pageZoom));
       const pct = Math.round(pageZoom * 100);
-      zoomResetBtn.textContent   = `${pct}%`;
-      fsZoomResetBtn.textContent = `${pct}%`;
+      zoomResetBtn.textContent = fsZoomResetBtn.textContent = `${pct}%`;
     }
-
-    function setPageZoom(nextZoom) {
-      const newZoom = clamp(Number(nextZoom) || 1, 0.25, 4);
-      if (Math.abs(newZoom - pageZoom) < 0.0001) return;
-      const ratio   = newZoom / pageZoom;
-      const scrollT = reader.scrollTop,  scrollL = reader.scrollLeft;
-      const clientH = reader.clientHeight, clientW = reader.clientWidth;
-      const anchorY = scrollT + clientH / 2, anchorX = scrollL + clientW / 2;
-      pageZoom = newZoom;
-      applyPageZoom();
-      const newH = reader.scrollHeight, newW = reader.scrollWidth;
-      reader.scrollTop  = clamp(anchorY * ratio - clientH / 2, 0, Math.max(0, newH - clientH));
-      reader.scrollLeft = clamp(anchorX * ratio - clientW / 2, 0, Math.max(0, newW - clientW));
+    function setPageZoom(z) {
+      const nz = clamp(Number(z) || 1, 0.25, 4);
+      if (Math.abs(nz - pageZoom) < 0.0001) return;
+      const r = nz / pageZoom;
+      const sT = reader.scrollTop, sL = reader.scrollLeft;
+      const cH = reader.clientHeight, cW = reader.clientWidth;
+      pageZoom = nz; applyPageZoom();
+      const nH = reader.scrollHeight, nW = reader.scrollWidth;
+      reader.scrollTop  = clamp((sT + cH / 2) * r - cH / 2, 0, Math.max(0, nH - cH));
+      reader.scrollLeft = clamp((sL + cW / 2) * r - cW / 2, 0, Math.max(0, nW - cW));
     }
-
     function zoomIn()    { setPageZoom(pageZoom + 0.1); }
     function zoomOut()   { setPageZoom(pageZoom - 0.1); }
     function resetZoom() { setPageZoom(1); }
 
-    /* ── Invert ─────────────────────────────────────────────────────────
-       toggle class 'inverted' บน body
-       CSS จะ filter: invert(1) เฉพาะ img ภายใน reader
-       ─────────────────────────────────────────────────────────────────*/
+    /* ── Invert ──────────────────────────────────────────────────────── */
     function applyInvert() {
       document.body.classList.toggle('inverted', invertColors);
-      // sync ทั้ง 2 ปุ่ม (topbar + fullscreen)
       invertBtn.classList.toggle('active',   invertColors);
       fsInvertBtn.classList.toggle('active', invertColors);
     }
-
     function toggleInvert() {
       invertColors = !invertColors;
       localStorage.setItem('cbz_invert', invertColors ? '1' : '0');
       applyInvert();
     }
-    /* ──────────────────────────────────────────────────────────────────*/
 
+    /* ── Theme / Mode / Thumbs ───────────────────────────────────────── */
     function setTheme(t) {
-      theme = t;
-      localStorage.setItem('cbz_theme', t);
+      theme = t; localStorage.setItem('cbz_theme', t);
       document.body.classList.toggle('mobile', t === 'mobile');
       document.body.classList.toggle('pc',     t === 'pc');
       btnMobile.classList.toggle('active', t === 'mobile');
       btnPc.classList.toggle('active',     t === 'pc');
-      if (theme === 'pc') setThumbsOpen(true);
+      if (t === 'pc') setThumbsOpen(true);
       updateView();
     }
-
     function setMode(m) {
-      mode = m;
-      localStorage.setItem('cbz_mode', m);
+      mode = m; localStorage.setItem('cbz_mode', m);
       btnScroll.classList.toggle('active', m === 'scroll');
       btnBook.classList.toggle('active',   m === 'book');
       updateView();
     }
-
     function setThumbsOpen(open) {
-      thumbsOpen = !!open;
-      localStorage.setItem('cbz_thumbs', thumbsOpen ? '1' : '0');
+      thumbsOpen = !!open; localStorage.setItem('cbz_thumbs', thumbsOpen ? '1' : '0');
       document.body.classList.toggle('thumbs-open', thumbsOpen);
       thumbPanel.classList.toggle('hidden', !thumbsOpen);
       thumbToggleBtn.classList.toggle('active', thumbsOpen);
       fsThumbBtn.classList.toggle('active',     thumbsOpen);
     }
-
     function toggleThumbs() { setThumbsOpen(!thumbsOpen); }
 
+    /* ── Clear ───────────────────────────────────────────────────────── */
     function clearPages() {
       for (const p of pages) { try { URL.revokeObjectURL(p.url); } catch {} }
-      pages = [];
-      currentIndex = 0;
-      scrollView.innerHTML = '';
-      thumbPanel.innerHTML = '';
+      pages = []; currentIndex = 0;
+      scrollView.innerHTML = ''; thumbPanel.innerHTML = '';
       leftPage.src = ''; rightPage.src = ''; singlePage.src = '';
       pageCounter.textContent = '0 / 0';
       prevBtn.disabled = nextBtn.disabled = firstBtn.disabled =
         lastBtn.disabled = bookPrev.disabled = bookNext.disabled = true;
       dropzone.classList.remove('hidden');
-      pageZoom = 1;
-      applyPageZoom();
+      pdfProgressWrap.classList.add('done');
+      pdfProgressBar.style.width = '0%';
+      pageZoom = 1; applyPageZoom();
     }
 
+    /* ── Loaders ─────────────────────────────────────────────────────── */
     async function loadImageFiles(fileList) {
       clearPages();
       setStatus('กำลังอ่านรูปภาพ...');
-      const files = [...fileList].filter(f => isImageFile(f.name)).sort((a, b) => naturalSort(a.name, b.name));
+      const files = [...fileList]
+        .filter(f => isImageFile(f.name))
+        .sort((a, b) => naturalSort(a.name, b.name));
       if (!files.length) { setStatus('ไม่พบรูปภาพ'); return; }
-      for (const file of files) pages.push({ name: file.name, url: URL.createObjectURL(file) });
+      for (const f of files) pages.push({ name: f.name, url: URL.createObjectURL(f) });
       currentIndex = 0;
       setStatus(`โหลดแล้ว ${pages.length} หน้า`);
       renderThumbs(); updateView();
@@ -582,13 +468,10 @@
 
     async function loadCbz(file) {
       if (!window.JSZip) { alert('JSZip โหลดไม่สำเร็จ'); return; }
-      clearPages();
-      setStatus('กำลังอ่านไฟล์...');
+      clearPages(); setStatus('กำลังอ่านไฟล์...');
       const zip = await JSZip.loadAsync(file);
       const entries = [];
-      zip.forEach((relativePath, zipEntry) => {
-        if (!zipEntry.dir && isImageFile(zipEntry.name)) entries.push(zipEntry.name);
-      });
+      zip.forEach((_, e) => { if (!e.dir && isImageFile(e.name)) entries.push(e.name); });
       entries.sort(naturalSort);
       if (!entries.length) { setStatus('ไม่พบรูปในไฟล์ CBZ'); return; }
       for (const name of entries) {
@@ -600,17 +483,96 @@
       renderThumbs(); updateView();
     }
 
+    /* ── PDF Loader ──────────────────────────────────────────────────── */
+    async function loadPdf(file) {
+      if (typeof pdfjsLib === 'undefined') {
+        setStatus('PDF.js โหลดไม่สำเร็จ — ตรวจสอบอินเตอร์เน็ต'); return;
+      }
+      if (pdfLoading) return;
+      pdfLoading = true;
+      clearPages();
+      setStatus('กำลังเปิด PDF...');
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const total = pdf.numPages;
+
+        // แสดง progress bar
+        pdfProgressWrap.classList.remove('done');
+
+        // Scale เป้าหมาย: ความกว้าง CSS ~800px × DPR ≤ 2
+        const dpr        = Math.min(window.devicePixelRatio || 1, 2);
+        const targetPx   = Math.min(960, (window.screen.width || 390)) * dpr;
+
+        const baseName = file.name.replace(/\.pdf$/i, '');
+
+        for (let i = 1; i <= total; i++) {
+          // อัปเดต progress
+          const pct = Math.round((i - 1) / total * 100);
+          pdfProgressBar.style.width = pct + '%';
+          setStatus(`PDF: แปลงหน้า ${i} / ${total}`);
+
+          const page      = await pdf.getPage(i);
+          const natural   = page.getViewport({ scale: 1 });
+          const scale     = targetPx / natural.width;
+          const viewport  = page.getViewport({ scale });
+
+          const canvas    = document.createElement('canvas');
+          canvas.width    = Math.round(viewport.width);
+          canvas.height   = Math.round(viewport.height);
+
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';  // พื้นขาวสำหรับ PDF โปร่งใส
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          await page.render({ canvasContext: ctx, viewport }).promise;
+
+          // canvas → JPEG blob → object URL
+          const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+          pages.push({
+            name: `${baseName} p${String(i).padStart(3, '0')}`,
+            url: URL.createObjectURL(blob)
+          });
+
+          // อัปเดต view แบบ progressive (หน้าแรก + ทุก 10 หน้า + หน้าสุดท้าย)
+          if (i === 1 || i % 10 === 0 || i === total) {
+            renderThumbs(); updateView();
+          }
+        }
+
+        // ซ่อน progress bar
+        pdfProgressBar.style.width = '100%';
+        setTimeout(() => pdfProgressWrap.classList.add('done'), 400);
+
+        currentIndex = 0;
+        setStatus(`PDF: ${total} หน้า`);
+        renderThumbs(); updateView();
+
+      } catch (err) {
+        console.error(err);
+        clearPages();
+        setStatus('เปิด PDF ไม่สำเร็จ: ' + (err?.message || err));
+      } finally {
+        pdfLoading = false;
+      }
+    }
+
     async function loadSelectedFiles(fileList) {
       const files = [...fileList];
       if (!files.length) return;
       const first = files[0];
       try {
-        if (files.length > 1 || isImageFile(first.name)) {
+        if (files.length === 1 && isPdfFile(first.name)) {
+          await loadPdf(first);
+        } else if (files.length > 1 || isImageFile(first.name)) {
           await loadImageFiles(files);
         } else if (isZipFile(first.name)) {
           await loadCbz(first);
+        } else if (isPdfFile(first.name)) {
+          await loadPdf(first);   // เผื่อ PDF จาก drop
         } else {
-          setStatus('รองรับ .cbz, .zip และไฟล์รูปภาพ');
+          setStatus('รองรับ .cbz, .zip, .pdf และไฟล์รูปภาพ');
         }
       } catch (err) {
         console.error(err);
@@ -619,56 +581,74 @@
       }
     }
 
+    /* ── Render ──────────────────────────────────────────────────────── */
     function updateButtons() {
-      const has = pages.length > 0;
+      const has  = pages.length > 0;
       const last = getMaxStartIndex();
       prevBtn.disabled  = firstBtn.disabled  = bookPrev.disabled = !has || currentIndex <= 0;
       nextBtn.disabled  = lastBtn.disabled   = bookNext.disabled = !has || currentIndex >= last;
     }
 
+    function makeScrollPage(i) {
+      const wrap = document.createElement('div');
+      wrap.className = 'scroll-page';
+      const img = document.createElement('img');
+      img.loading = 'lazy'; img.decoding = 'async';
+      img.src = pages[i].url; img.alt = pages[i].name;
+      wrap.appendChild(img);
+      return wrap;
+    }
+
     function renderScroll() {
-      if (scrollView.childElementCount !== pages.length) {
-        const savedScrollTop   = reader.scrollTop;
-        const prevScrollHeight = reader.scrollHeight;
-        scrollView.innerHTML = '';
-        for (let i = 0; i < pages.length; i++) {
-          const wrap = document.createElement('div');
-          wrap.className = 'scroll-page';
-          const img = document.createElement('img');
-          img.loading = 'lazy'; img.decoding = 'async';
-          img.src = pages[i].url; img.alt = pages[i].name;
-          wrap.appendChild(img);
-          scrollView.appendChild(wrap);
+      const existing = scrollView.childElementCount;
+      const total    = pages.length;
+
+      if (existing < total) {
+        // เพิ่มเฉพาะหน้าที่ยังไม่มี (รองรับ PDF progressive load)
+        for (let i = existing; i < total; i++) {
+          scrollView.appendChild(makeScrollPage(i));
         }
-        if (prevScrollHeight > 0 && savedScrollTop > 0) {
+      } else if (existing > total) {
+        // Rebuild หลัง clearPages
+        const savedTop  = reader.scrollTop;
+        const prevH     = reader.scrollHeight;
+        scrollView.innerHTML = '';
+        for (let i = 0; i < total; i++) scrollView.appendChild(makeScrollPage(i));
+        if (prevH > 0 && savedTop > 0) {
           requestAnimationFrame(() => {
-            reader.scrollTop = (savedScrollTop / prevScrollHeight) * reader.scrollHeight;
+            reader.scrollTop = (savedTop / prevH) * reader.scrollHeight;
           });
         }
       } else {
-        for (let i = 0; i < pages.length; i++) {
+        // จำนวนเท่ากัน → อัปเดต src ถ้าจำเป็น
+        for (let i = 0; i < total; i++) {
           const img = scrollView.children[i]?.querySelector('img');
           if (img && img.src !== pages[i].url) img.src = pages[i].url;
         }
       }
     }
 
+    function addThumb(index) {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'thumb-item';
+      const img = document.createElement('img');
+      img.loading = 'lazy'; img.decoding = 'async';
+      img.src = pages[index].url; img.alt = pages[index].name;
+      btn.appendChild(img);
+      btn.addEventListener('click', () => {
+        currentIndex = index; updateView(); syncScrollToCurrent();
+      });
+      thumbPanel.appendChild(btn);
+    }
+
     function renderThumbs() {
       if (!pages.length) { thumbPanel.innerHTML = ''; return; }
-      if (thumbPanel.childElementCount !== pages.length) {
+      const existing = thumbPanel.childElementCount;
+      if (existing > pages.length) {
         thumbPanel.innerHTML = '';
-        pages.forEach((page, index) => {
-          const btn = document.createElement('button');
-          btn.type = 'button'; btn.className = 'thumb-item';
-          const img = document.createElement('img');
-          img.loading = 'lazy'; img.decoding = 'async';
-          img.src = page.url; img.alt = page.name;
-          btn.appendChild(img);
-          btn.addEventListener('click', () => {
-            currentIndex = index; updateView(); syncScrollToCurrent();
-          });
-          thumbPanel.appendChild(btn);
-        });
+        for (let i = 0; i < pages.length; i++) addThumb(i);
+      } else {
+        for (let i = existing; i < pages.length; i++) addThumb(i);
       }
       updateThumbActive();
     }
@@ -679,15 +659,13 @@
     }
 
     function renderBook() {
-      const total = pages.length;
-      if (!total) return;
+      const total = pages.length; if (!total) return;
       if (isSpreadView()) {
         normalizeSpreadIndex();
-        const li = currentIndex, ri = currentIndex + 1;
-        const rOk = ri < total;
-        pageCounter.textContent = rOk ? `${li+1}-${ri+1} / ${total}` : `${li+1} / ${total}`;
-        leftPage.src  = pages[li]?.url || ''; leftPage.alt  = pages[li]?.name || '';
-        rightPage.src = rOk ? (pages[ri]?.url || '') : ''; rightPage.alt = rOk ? (pages[ri]?.name || '') : '';
+        const li = currentIndex, ri = li + 1, rOk = ri < total;
+        pageCounter.textContent = rOk ? `${li+1}–${ri+1} / ${total}` : `${li+1} / ${total}`;
+        leftPage.src  = pages[li]?.url || '';  leftPage.alt  = pages[li]?.name || '';
+        rightPage.src = rOk ? pages[ri].url : ''; rightPage.alt = rOk ? pages[ri].name : '';
         rightPage.parentElement.style.visibility = rOk ? 'visible' : 'hidden';
       } else {
         pageCounter.textContent = `${currentIndex+1} / ${total}`;
@@ -699,8 +677,7 @@
     function updateView() {
       if (!pages.length) {
         reader.classList.add('scroll');
-        scrollView.classList.add('hidden');
-        bookShell.classList.add('hidden');
+        scrollView.classList.add('hidden'); bookShell.classList.add('hidden');
         dropzone.classList.remove('hidden');
         updateButtons(); updateThumbActive(); return;
       }
@@ -708,19 +685,19 @@
       const showScroll = mode === 'scroll';
       reader.classList.toggle('scroll', showScroll);
       scrollView.classList.toggle('hidden', !showScroll);
-      bookShell.classList.toggle('hidden',  showScroll);
+      bookShell.classList.toggle('hidden',   showScroll);
       if (showScroll) renderScroll(); else renderBook();
       updateButtons(); updateThumbActive();
     }
 
+    /* ── Navigation ──────────────────────────────────────────────────── */
     function nextPage() {
       if (!pages.length || busy) return;
-      const maxStart = getMaxStartIndex();
-      if (currentIndex >= maxStart) return;
-      currentIndex = Math.min(currentIndex + (mode === 'book' ? getBookStep() : 1), maxStart);
+      const max = getMaxStartIndex();
+      if (currentIndex >= max) return;
+      currentIndex = Math.min(currentIndex + (mode === 'book' ? getBookStep() : 1), max);
       updateView(); syncScrollToCurrent();
     }
-
     function prevPage() {
       if (!pages.length || busy) return;
       if (currentIndex <= 0) return;
@@ -728,21 +705,18 @@
       if (isSpreadView()) normalizeSpreadIndex();
       updateView(); syncScrollToCurrent();
     }
-
     function firstPage() { currentIndex = 0; updateView(); syncScrollToCurrent(); }
-
     function lastPage() {
       currentIndex = getMaxStartIndex();
       if (isSpreadView()) normalizeSpreadIndex();
       updateView(); syncScrollToCurrent();
     }
-
     function syncScrollToCurrent() {
       if (mode !== 'scroll') return;
-      const target = scrollView.children[currentIndex];
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollView.children[currentIndex]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    /* ── Fullscreen ──────────────────────────────────────────────────── */
     async function toggleFullscreen() {
       try {
         if (isIOS() || !document.documentElement.requestFullscreen) {
@@ -756,21 +730,22 @@
           document.body.classList.remove('fullscreen-reading');
         }
       } catch(e) {
-        console.error('Fullscreen API error:', e);
         document.body.classList.toggle('fullscreen-reading');
       }
     }
-
-    function onFullscreenChanged() {
+    document.addEventListener('fullscreenchange', () => {
       document.body.classList.toggle('fullscreen-reading', !!document.fullscreenElement);
-    }
+    });
 
-    /* ── Event Listeners ── */
-    openFileBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', async (e) => { await loadSelectedFiles(e.target.files); e.target.value = ''; });
+    /* ── Event Listeners ─────────────────────────────────────────────── */
+    openFileBtn.addEventListener('click',  () => fileInput.click());
+    fileInput.addEventListener('change',   async (e) => { await loadSelectedFiles(e.target.files); e.target.value = ''; });
     dropzone.addEventListener('dragover',  (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
     dropzone.addEventListener('dragleave', ()  => dropzone.classList.remove('dragover'));
-    dropzone.addEventListener('drop', async (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); await loadSelectedFiles(e.dataTransfer.files); });
+    dropzone.addEventListener('drop',      async (e) => {
+      e.preventDefault(); dropzone.classList.remove('dragover');
+      await loadSelectedFiles(e.dataTransfer.files);
+    });
 
     btnMobile.addEventListener('click', () => setTheme('mobile'));
     btnPc.addEventListener('click',     () => setTheme('pc'));
@@ -779,11 +754,11 @@
     thumbToggleBtn.addEventListener('click', toggleThumbs);
     fsThumbBtn.addEventListener('click',     toggleThumbs);
 
-    zoomOutBtn.addEventListener('click',  zoomOut);
-    zoomInBtn.addEventListener('click',   zoomIn);
+    zoomOutBtn.addEventListener('click',   zoomOut);
+    zoomInBtn.addEventListener('click',    zoomIn);
     zoomResetBtn.addEventListener('click', resetZoom);
-    fsZoomOutBtn.addEventListener('click',  zoomOut);
-    fsZoomInBtn.addEventListener('click',   zoomIn);
+    fsZoomOutBtn.addEventListener('click',   zoomOut);
+    fsZoomInBtn.addEventListener('click',    zoomIn);
     fsZoomResetBtn.addEventListener('click', resetZoom);
 
     invertBtn.addEventListener('click',   toggleInvert);
@@ -812,9 +787,7 @@
       if (e.key === '0') resetZoom();
     });
 
-    document.addEventListener('fullscreenchange', onFullscreenChanged);
-
-    /* ── Book mode swipe ── */
+    /* ── Book mode swipe ─────────────────────────────────────────────── */
     let touchStartX = 0, touchStartY = 0;
     reader.addEventListener('touchstart', (e) => {
       if (!pages.length || mode !== 'book' || e.touches.length !== 1 || pinchActive) return;
@@ -827,10 +800,10 @@
       if (Math.abs(dx) > 50 && Math.abs(dy) < 35) { dx < 0 ? nextPage() : prevPage(); }
     }, { passive: true });
 
-    /* ── Init ── */
+    /* ── Init ────────────────────────────────────────────────────────── */
     updateOrientationState();
     applyPageZoom();
-    applyInvert();          // restore invert state จาก localStorage
+    applyInvert();
     setTheme(theme);
     setMode(mode);
     setThumbsOpen(thumbsOpen);
@@ -843,10 +816,12 @@
         updateOrientationState(); updateView(); resizeRaf = null;
       });
     });
-
     window.addEventListener('orientationchange', () => {
       setTimeout(() => { updateOrientationState(); updateView(); }, 100);
     });
   </script>
 </body>
 </html>
+
+
+
