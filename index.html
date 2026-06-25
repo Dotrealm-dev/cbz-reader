@@ -33,7 +33,6 @@
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       overflow: hidden;
       overscroll-behavior: none;
-      /* บอก browser ว่าเราจัดการ pan+pinch เอง ทั้งหน้า */
       touch-action: pan-x pan-y;
     }
 
@@ -65,7 +64,6 @@
       background: #202635; color: var(--text);
       border: 1px solid var(--border);
       border-radius: 10px; padding: 10px 12px; font-size: 14px;
-      /* ปุ่มแยก touch-action เฉพาะ manipulation (tap, no zoom) */
       touch-action: manipulation;
     }
 
@@ -106,8 +104,6 @@
       overscroll-behavior: none;
       -webkit-overflow-scrolling: touch;
       overflow-anchor: none;
-      /* pan-x pan-y: single-touch scroll ปกติ
-         browser จะไม่ทำ native pinch-zoom (เราทำเองผ่าน document handler) */
       touch-action: pan-x pan-y;
     }
 
@@ -131,6 +127,16 @@
       user-select: none; -webkit-user-drag: none; pointer-events: none;
     }
 
+    /* ── Invert: กลับสีเฉพาะภาพมังงะ ──────────────────────────────────
+       ใช้ filter: invert(1) กับภาพโดยตรง
+       → ขาว→ดำ ดำ→ขาว  UI อื่น (topbar / panel) ไม่ถูกกระทบ        */
+    body.inverted .scroll-page img,
+    body.inverted .page img,
+    body.inverted .single-page img {
+      filter: invert(1);
+    }
+    /* ──────────────────────────────────────────────────────────────────*/
+
     .book-shell {
       position: absolute; inset: 0;
       display: grid; place-items: center; padding: 16px;
@@ -153,6 +159,10 @@
       box-shadow: 0 12px 40px var(--shadow);
       display: flex; align-items: center; justify-content: center;
     }
+
+    /* เมื่อ invert ให้พื้นหลัง page เปลี่ยนเป็นดำด้วย */
+    body.inverted .page,
+    body.inverted .single-page img { background: #000; }
 
     .page img {
       width: 100%; height: 100%; object-fit: contain;
@@ -224,9 +234,15 @@
       user-select: none; -webkit-user-drag: none; pointer-events: none;
     }
 
+    /* ── Fullscreen tools: column layout เรียงจากบนลงล่าง
+       Exit อยู่ล่างสุด, Invert อยู่เหนือ Exit ── */
     .fullscreen-tools {
       position: fixed; right: 12px; bottom: 12px;
-      display: none; gap: 8px; z-index: 40;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+      z-index: 40;
     }
 
     body.fullscreen-reading .fullscreen-tools { display: flex; }
@@ -282,6 +298,7 @@
         <button id="zoomOutBtn">－</button>
         <button id="zoomResetBtn">100%</button>
         <button id="zoomInBtn">＋</button>
+        <button id="invertBtn">☀︎</button>
         <button id="fullscreenBtn">Fullscreen</button>
       </div>
       <div class="group">
@@ -318,11 +335,13 @@
 
     <div id="thumbPanel" class="thumb-panel hidden"></div>
 
+    <!-- fullscreen-tools: column layout, Exit อยู่ล่างสุด -->
     <div class="fullscreen-tools">
       <button id="fsThumbBtn">Thumbs</button>
       <button id="fsZoomOutBtn">－</button>
       <button id="fsZoomResetBtn">100%</button>
       <button id="fsZoomInBtn">＋</button>
+      <button id="fsInvertBtn">☀︎</button>   <!-- Invert: อยู่เหนือ Exit -->
       <button id="fsExitBtn">Exit</button>
     </div>
   </div>
@@ -343,11 +362,13 @@
     const zoomOutBtn     = document.getElementById('zoomOutBtn');
     const zoomResetBtn   = document.getElementById('zoomResetBtn');
     const zoomInBtn      = document.getElementById('zoomInBtn');
+    const invertBtn      = document.getElementById('invertBtn');
     const fullscreenBtn  = document.getElementById('fullscreenBtn');
     const fsThumbBtn     = document.getElementById('fsThumbBtn');
     const fsZoomOutBtn   = document.getElementById('fsZoomOutBtn');
     const fsZoomResetBtn = document.getElementById('fsZoomResetBtn');
     const fsZoomInBtn    = document.getElementById('fsZoomInBtn');
+    const fsInvertBtn    = document.getElementById('fsInvertBtn');
     const fsExitBtn      = document.getElementById('fsExitBtn');
     const prevBtn        = document.getElementById('prevBtn');
     const nextBtn        = document.getElementById('nextBtn');
@@ -367,103 +388,55 @@
     let mode         = localStorage.getItem('cbz_mode')  || 'scroll';
     let thumbsOpen   = localStorage.getItem('cbz_thumbs');
     let pageZoom     = Number(localStorage.getItem('cbz_page_zoom') || '1');
+    let invertColors = localStorage.getItem('cbz_invert') === '1';
     let busy         = false;
 
     if (thumbsOpen === null) thumbsOpen = (theme === 'pc') ? '1' : '0';
     thumbsOpen = thumbsOpen === '1';
 
-    /* ══════════════════════════════════════════════════════════════════════
-     * PINCH-TO-ZOOM — Document level (ทำงานทุกที่บนหน้า ไม่ใช่แค่ reader)
-     *
-     * หลักการ:
-     *  • จับ touchstart/move/end ที่ document เพื่อดักทุก 2-finger gesture
-     *  • เมื่อตรวจพบ 2 นิ้ว → คำนวณ zoom = zoom0 × (dist_ใหม่ / dist_เดิม)
-     *  • เซ็ต --scroll-scale ทันทีทุก touchmove frame → ไม่มี sticky / snap
-     *  • ปรับ reader.scrollTop/Left ให้จุดใต้นิ้วคงตำแหน่งเดิมบนจอ
-     *  • preventDefault() บน touchmove 2 นิ้ว → ป้องกัน browser native zoom
-     *    และ pull-to-refresh ระหว่าง pinch
-     *  • single-touch ไม่ถูกแตะ → scroll ปกติ
-     * ════════════════════════════════════════════════════════════════════*/
-
-    let pinchActive   = false;
-    let pinchDist0    = 0;
-    let pinchZoom0    = 1;
-    let pinchMidX     = 0;   // จุดกึ่งกลางนิ้วบน screen ตอน pinch เริ่ม
-    let pinchMidY     = 0;
-    let pinchScrollX0 = 0;   // reader.scrollLeft ตอน pinch เริ่ม
-    let pinchScrollY0 = 0;   // reader.scrollTop  ตอน pinch เริ่ม
+    /* ── Pinch-to-zoom (document level) ────────────────────────────────*/
+    let pinchActive = false, pinchDist0 = 0, pinchZoom0 = 1;
+    let pinchMidX = 0, pinchMidY = 0, pinchScrollX0 = 0, pinchScrollY0 = 0;
 
     function ptDist(t1, t2) {
       return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     }
 
-    // รีเซ็ต pinch state จาก touches ปัจจุบัน (ใช้ทั้งตอน start และตอนนิ้วที่ 2 เพิ่มเข้ามา)
     function initPinch(touches) {
       pinchActive   = true;
       pinchDist0    = ptDist(touches[0], touches[1]);
       pinchZoom0    = pageZoom;
       pinchMidX     = (touches[0].clientX + touches[1].clientX) / 2;
       pinchMidY     = (touches[0].clientY + touches[1].clientY) / 2;
-      // อ่าน scroll จาก reader เสมอ (ใช้เป็น anchor ของเนื้อหา)
       pinchScrollX0 = reader.scrollLeft;
       pinchScrollY0 = reader.scrollTop;
     }
 
-    // touchstart: จับ 2 นิ้วได้ที่ไหนก็ได้บนหน้า
     document.addEventListener('touchstart', (e) => {
       if (e.touches.length === 2) initPinch(e.touches);
-      // ถ้านิ้วที่ 3 ขึ้นมา ยกเลิก pinch
-      if (e.touches.length > 2) pinchActive = false;
+      if (e.touches.length > 2)  pinchActive = false;
     }, { passive: true });
 
-    // touchmove: non-passive เพื่อเรียก preventDefault ได้
     document.addEventListener('touchmove', (e) => {
-      // ไม่ใช่ pinch → ปล่อยให้ browser จัดการ scroll ปกติ
       if (!pinchActive || e.touches.length < 2) return;
-
-      // หยุด native pinch-zoom ของ browser และ pull-to-refresh
       e.preventDefault();
-
       const newDist = ptDist(e.touches[0], e.touches[1]);
       if (pinchDist0 < 1) return;
-
-      // zoom ใหม่ = zoom เดิม × อัตราส่วนระยะนิ้ว (ต่อเนื่อง ไม่ snap)
-      const rawZoom = pinchZoom0 * (newDist / pinchDist0);
-      const newZoom = clamp(rawZoom, 0.25, 4);
-
-      // อัปเดต CSS variable ทันที
+      const newZoom = clamp(pinchZoom0 * (newDist / pinchDist0), 0.25, 4);
       pageZoom = newZoom;
       applyPageZoom();
-
-      // บังคับ synchronous layout เพื่ออ่าน scrollHeight/Width ที่อัปเดตแล้ว
-      const newH  = reader.scrollHeight;
-      const newW  = reader.scrollWidth;
-      const cH    = reader.clientHeight;
-      const cW    = reader.clientWidth;
-
-      // คำนวณ scroll ใหม่เพื่อให้จุดเนื้อหาที่อยู่ใต้จุดกึ่งกลางนิ้ว
-      // ยังคงอยู่ที่ตำแหน่งเดิมบนหน้าจอหลัง zoom
-      // anchor (เนื้อหา) = scroll0 + mid_screen
-      // หลัง zoom anchor อยู่ที่ anchor × ratio ใน content-space ใหม่
-      // ต้องการให้ anchor อยู่ที่ midX/midY บนหน้าจอ → scrollNew = anchor×ratio − mid
-      const ratio   = newZoom / pinchZoom0;
-      const anchorX = pinchScrollX0 + pinchMidX;
-      const anchorY = pinchScrollY0 + pinchMidY;
-
-      reader.scrollLeft = clamp(anchorX * ratio - pinchMidX, 0, Math.max(0, newW - cW));
-      reader.scrollTop  = clamp(anchorY * ratio - pinchMidY, 0, Math.max(0, newH - cH));
+      const newH = reader.scrollHeight, newW = reader.scrollWidth;
+      const cH   = reader.clientHeight, cW   = reader.clientWidth;
+      const ratio = newZoom / pinchZoom0;
+      reader.scrollLeft = clamp(
+        (pinchScrollX0 + pinchMidX) * ratio - pinchMidX, 0, Math.max(0, newW - cW));
+      reader.scrollTop  = clamp(
+        (pinchScrollY0 + pinchMidY) * ratio - pinchMidY, 0, Math.max(0, newH - cH));
     }, { passive: false });
 
-    // touchend: ถ้าเหลือนิ้วน้อยกว่า 2 → จบ pinch
-    document.addEventListener('touchend', (e) => {
-      if (e.touches.length < 2) pinchActive = false;
-    }, { passive: true });
-
-    document.addEventListener('touchcancel', () => {
-      pinchActive = false;
-    }, { passive: true });
-
-    /* ════════════════════════════════════════════════════════════════════*/
+    document.addEventListener('touchend',   (e) => { if (e.touches.length < 2) pinchActive = false; }, { passive: true });
+    document.addEventListener('touchcancel', ()  => { pinchActive = false; },                           { passive: true });
+    /* ──────────────────────────────────────────────────────────────────*/
 
     function isIOS() {
       return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -471,7 +444,6 @@
     }
 
     function setStatus(msg) { statusEl.textContent = msg; }
-
     function isImageFile(name) { return /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(name); }
     function isZipFile(name)   { return /\.(cbz|zip)$/i.test(name); }
 
@@ -519,22 +491,13 @@
     function setPageZoom(nextZoom) {
       const newZoom = clamp(Number(nextZoom) || 1, 0.25, 4);
       if (Math.abs(newZoom - pageZoom) < 0.0001) return;
-
       const ratio   = newZoom / pageZoom;
-      const scrollT = reader.scrollTop;
-      const scrollL = reader.scrollLeft;
-      const clientH = reader.clientHeight;
-      const clientW = reader.clientWidth;
-
-      const anchorY = scrollT + clientH / 2;
-      const anchorX = scrollL + clientW / 2;
-
+      const scrollT = reader.scrollTop,  scrollL = reader.scrollLeft;
+      const clientH = reader.clientHeight, clientW = reader.clientWidth;
+      const anchorY = scrollT + clientH / 2, anchorX = scrollL + clientW / 2;
       pageZoom = newZoom;
       applyPageZoom();
-
-      const newH = reader.scrollHeight;
-      const newW = reader.scrollWidth;
-
+      const newH = reader.scrollHeight, newW = reader.scrollWidth;
       reader.scrollTop  = clamp(anchorY * ratio - clientH / 2, 0, Math.max(0, newH - clientH));
       reader.scrollLeft = clamp(anchorX * ratio - clientW / 2, 0, Math.max(0, newW - clientW));
     }
@@ -542,6 +505,24 @@
     function zoomIn()    { setPageZoom(pageZoom + 0.1); }
     function zoomOut()   { setPageZoom(pageZoom - 0.1); }
     function resetZoom() { setPageZoom(1); }
+
+    /* ── Invert ─────────────────────────────────────────────────────────
+       toggle class 'inverted' บน body
+       CSS จะ filter: invert(1) เฉพาะ img ภายใน reader
+       ─────────────────────────────────────────────────────────────────*/
+    function applyInvert() {
+      document.body.classList.toggle('inverted', invertColors);
+      // sync ทั้ง 2 ปุ่ม (topbar + fullscreen)
+      invertBtn.classList.toggle('active',   invertColors);
+      fsInvertBtn.classList.toggle('active', invertColors);
+    }
+
+    function toggleInvert() {
+      invertColors = !invertColors;
+      localStorage.setItem('cbz_invert', invertColors ? '1' : '0');
+      applyInvert();
+    }
+    /* ──────────────────────────────────────────────────────────────────*/
 
     function setTheme(t) {
       theme = t;
@@ -649,7 +630,6 @@
       if (scrollView.childElementCount !== pages.length) {
         const savedScrollTop   = reader.scrollTop;
         const prevScrollHeight = reader.scrollHeight;
-
         scrollView.innerHTML = '';
         for (let i = 0; i < pages.length; i++) {
           const wrap = document.createElement('div');
@@ -660,7 +640,6 @@
           wrap.appendChild(img);
           scrollView.appendChild(wrap);
         }
-
         if (prevScrollHeight > 0 && savedScrollTop > 0) {
           requestAnimationFrame(() => {
             reader.scrollTop = (savedScrollTop / prevScrollHeight) * reader.scrollHeight;
@@ -751,6 +730,7 @@
     }
 
     function firstPage() { currentIndex = 0; updateView(); syncScrollToCurrent(); }
+
     function lastPage() {
       currentIndex = getMaxStartIndex();
       if (isSpreadView()) normalizeSpreadIndex();
@@ -806,6 +786,9 @@
     fsZoomInBtn.addEventListener('click',   zoomIn);
     fsZoomResetBtn.addEventListener('click', resetZoom);
 
+    invertBtn.addEventListener('click',   toggleInvert);
+    fsInvertBtn.addEventListener('click', toggleInvert);
+
     fullscreenBtn.addEventListener('click', toggleFullscreen);
     fsExitBtn.addEventListener('click',     toggleFullscreen);
 
@@ -823,6 +806,7 @@
       if (e.key === 'Home') firstPage();
       if (e.key === 'End')  lastPage();
       if (e.key.toLowerCase() === 'f') toggleFullscreen();
+      if (e.key.toLowerCase() === 'i') toggleInvert();
       if (e.key === '+' || e.key === '=') zoomIn();
       if (e.key === '-' || e.key === '_') zoomOut();
       if (e.key === '0') resetZoom();
@@ -830,10 +814,9 @@
 
     document.addEventListener('fullscreenchange', onFullscreenChanged);
 
-    /* ── Book mode swipe (1 นิ้วใน reader เท่านั้น) ── */
+    /* ── Book mode swipe ── */
     let touchStartX = 0, touchStartY = 0;
     reader.addEventListener('touchstart', (e) => {
-      // ไม่รับถ้ากำลัง pinch อยู่ หรือนิ้วมากกว่า 1
       if (!pages.length || mode !== 'book' || e.touches.length !== 1 || pinchActive) return;
       touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
     }, { passive: true });
@@ -847,6 +830,7 @@
     /* ── Init ── */
     updateOrientationState();
     applyPageZoom();
+    applyInvert();          // restore invert state จาก localStorage
     setTheme(theme);
     setMode(mode);
     setThumbsOpen(thumbsOpen);
@@ -856,9 +840,7 @@
     window.addEventListener('resize', () => {
       if (resizeRaf) cancelAnimationFrame(resizeRaf);
       resizeRaf = requestAnimationFrame(() => {
-        updateOrientationState();
-        updateView();
-        resizeRaf = null;
+        updateOrientationState(); updateView(); resizeRaf = null;
       });
     });
 
