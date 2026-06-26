@@ -38,6 +38,25 @@
       position: sticky; top: 0; flex-shrink: 0;
     }
     .topbar .group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    /* ── Go-to-page input group ── */
+    .goto-group {
+      display: flex; gap: 4px; align-items: center;
+    }
+    .goto-group input[type="number"] {
+      width: 64px; padding: 9px 8px; font-size: 14px;
+      background: #202635; color: var(--text);
+      border: 1px solid var(--border); border-radius: 10px;
+      -moz-appearance: textfield; text-align: center;
+    }
+    .goto-group input[type="number"]::-webkit-inner-spin-button,
+    .goto-group input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .goto-group input[type="number"]:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .goto-group button { min-width: 46px; }
+    .goto-group .page-total { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
     button, input[type="file"] {
       background: #202635; color: var(--text);
       border: 1px solid var(--border);
@@ -51,6 +70,26 @@
       color: var(--muted); font-size: 13px; margin-left: auto;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 44vw;
     }
+
+    /* ── Resume toast ── */
+    #resumeToast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #1e2a3a; color: var(--text);
+      border: 1px solid var(--accent); border-radius: 14px;
+      padding: 12px 20px; font-size: 14px; z-index: 100;
+      box-shadow: 0 4px 20px rgba(0,0,0,.5);
+      display: flex; gap: 12px; align-items: center;
+      opacity: 0; transition: opacity .25s ease;
+      pointer-events: none;
+    }
+    #resumeToast.show { opacity: 1; pointer-events: auto; }
+    #resumeToast button {
+      padding: 6px 14px; font-size: 13px; border-radius: 8px;
+    }
+    #resumeToast .toast-dismiss {
+      background: transparent; border-color: var(--border); color: var(--muted);
+    }
+
     .dropzone {
       margin: 10px; padding: 16px;
       border: 2px dashed var(--border); border-radius: 16px;
@@ -179,6 +218,7 @@
       :root { --thumb-w: 96px; }
       .topbar { gap: 6px; }
       button, input[type="file"] { padding: 9px 10px; font-size: 13px; }
+      .goto-group input[type="number"] { width: 52px; }
     }
   </style>
 </head>
@@ -206,13 +246,19 @@
         <button id="firstBtn" disabled>First</button>
         <button id="lastBtn" disabled>Last</button>
       </div>
+      <!-- ── Go-to-page ── -->
+      <div class="goto-group">
+        <input id="gotoInput" type="number" min="1" placeholder="หน้า" disabled title="กรอกเลขหน้าแล้วกด Enter หรือ Go" />
+        <button id="gotoBtn" disabled>Go</button>
+        <span class="page-total" id="gotoTotal">/ 0</span>
+      </div>
       <div class="status" id="status">เลือกไฟล์ CBZ / ZIP / PDF หรือรูปภาพ</div>
     </div>
 
     <div id="dropzone" class="dropzone">ลากไฟล์ .cbz, .zip, .pdf หรือรูปภาพมาวางตรงนี้</div>
 
     <div id="reader" class="reader scroll">
-      <!-- PDF progress bar (แสดงระหว่างแปลง) -->
+      <!-- PDF progress bar -->
       <div id="pdfProgressWrap" class="pdf-progress done">
         <div id="pdfProgressBar" class="pdf-progress-bar"></div>
       </div>
@@ -247,8 +293,15 @@
     </div>
   </div>
 
+  <!-- ── Resume toast ── -->
+  <div id="resumeToast">
+    <span id="resumeMsg">อ่านค้างไว้ที่หน้า <strong id="resumePageNum">?</strong></span>
+    <button id="resumeGoBtn">ไปหน้านั้น</button>
+    <button class="toast-dismiss" id="resumeDismissBtn">ข้าม</button>
+  </div>
+
   <script>
-    /* ── PDF.js worker setup ─────────────────────────────────────────── */
+    /* ── PDF.js worker ───────────────────────────────────────────────── */
     if (typeof pdfjsLib !== 'undefined') {
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
@@ -291,6 +344,16 @@
     const thumbPanel      = document.getElementById('thumbPanel');
     const pdfProgressWrap = document.getElementById('pdfProgressWrap');
     const pdfProgressBar  = document.getElementById('pdfProgressBar');
+    // Go-to-page
+    const gotoInput       = document.getElementById('gotoInput');
+    const gotoBtn         = document.getElementById('gotoBtn');
+    const gotoTotal       = document.getElementById('gotoTotal');
+    // Resume toast
+    const resumeToast     = document.getElementById('resumeToast');
+    const resumeMsg       = document.getElementById('resumeMsg');
+    const resumePageNum   = document.getElementById('resumePageNum');
+    const resumeGoBtn     = document.getElementById('resumeGoBtn');
+    const resumeDismissBtn= document.getElementById('resumeDismissBtn');
 
     /* ── State ───────────────────────────────────────────────────────── */
     let pages        = [];
@@ -301,12 +364,81 @@
     let pageZoom     = Number(localStorage.getItem('cbz_page_zoom') || '1');
     let invertColors = localStorage.getItem('cbz_invert') === '1';
     let busy         = false;
-    let pdfLoading   = false; // ป้องกัน load ซ้อน
+    let pdfLoading   = false;
+    let currentFileName = ''; // ชื่อไฟล์ที่เปิดอยู่
 
     if (thumbsOpen === null) thumbsOpen = (theme === 'pc') ? '1' : '0';
     thumbsOpen = thumbsOpen === '1';
 
-    /* ── Pinch-to-zoom (document level) ─────────────────────────────── */
+    /* ── Last-position memory ────────────────────────────────────────── */
+    const HISTORY_KEY = 'cbz_history'; // { [fileName]: pageIndex }
+
+    function saveLastPosition() {
+      if (!currentFileName || !pages.length) return;
+      try {
+        const h = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}');
+        h[currentFileName] = currentIndex;
+        // จำแค่ 50 ไฟล์ล่าสุด เพื่อไม่ให้ localStorage เต็ม
+        const keys = Object.keys(h);
+        if (keys.length > 50) delete h[keys[0]];
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+      } catch (e) {}
+    }
+
+    function getLastPosition(fileName) {
+      try {
+        const h = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}');
+        return (fileName in h) ? Number(h[fileName]) : -1;
+      } catch { return -1; }
+    }
+
+    /* ── Resume toast ────────────────────────────────────────────────── */
+    let _resumeTarget = -1;
+    let _toastTimer   = null;
+
+    function showResumeToast(pageIndex) {
+      _resumeTarget = pageIndex;
+      resumePageNum.textContent = pageIndex + 1;
+      resumeToast.classList.add('show');
+      // ซ่อนอัตโนมัติหลัง 8 วินาที
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(hideResumeToast, 8000);
+    }
+    function hideResumeToast() {
+      resumeToast.classList.remove('show');
+      clearTimeout(_toastTimer);
+    }
+    resumeGoBtn.addEventListener('click', () => {
+      if (_resumeTarget >= 0 && _resumeTarget < pages.length) {
+        currentIndex = _resumeTarget;
+        updateView(); syncScrollToCurrent();
+      }
+      hideResumeToast();
+    });
+    resumeDismissBtn.addEventListener('click', hideResumeToast);
+
+    /* ── Go-to-page ──────────────────────────────────────────────────── */
+    function gotoPage() {
+      const n = parseInt(gotoInput.value, 10);
+      if (isNaN(n) || !pages.length) return;
+      const idx = clamp(n - 1, 0, pages.length - 1);
+      currentIndex = idx;
+      if (mode === 'book' && isSpreadView()) normalizeSpreadIndex();
+      updateView(); syncScrollToCurrent();
+      gotoInput.blur();
+    }
+    gotoBtn.addEventListener('click', gotoPage);
+    gotoInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') gotoPage(); });
+
+    function updateGotoUI() {
+      const has = pages.length > 0;
+      gotoInput.disabled = !has;
+      gotoBtn.disabled   = !has;
+      gotoInput.max      = pages.length || 1;
+      gotoTotal.textContent = `/ ${pages.length}`;
+    }
+
+    /* ── Pinch-to-zoom ───────────────────────────────────────────────── */
     let pinchActive = false, pinchDist0 = 0, pinchZoom0 = 1;
     let pinchMidX = 0, pinchMidY = 0, pinchScrollX0 = 0, pinchScrollY0 = 0;
 
@@ -341,6 +473,29 @@
     }, { passive: false });
     document.addEventListener('touchend',    (e) => { if (e.touches.length < 2) pinchActive = false; }, { passive: true });
     document.addEventListener('touchcancel', ()  => { pinchActive = false; },                           { passive: true });
+
+    /* ── Scroll → update currentIndex ───────────────────────────────── */
+    let scrollSaveTimer = null;
+    reader.addEventListener('scroll', () => {
+      if (mode !== 'scroll' || !pages.length) return;
+      // หา index ของหน้าที่กำลังแสดงอยู่
+      const children = scrollView.children;
+      const mid = reader.scrollTop + reader.clientHeight / 2;
+      let best = 0, bestDist = Infinity;
+      for (let i = 0; i < children.length; i++) {
+        const el = children[i];
+        const dist = Math.abs(el.offsetTop + el.offsetHeight / 2 - mid);
+        if (dist < bestDist) { bestDist = dist; best = i; }
+      }
+      if (best !== currentIndex) {
+        currentIndex = best;
+        updateThumbActive();
+        updateButtons();
+      }
+      // บันทึกตำแหน่งแบบ debounce
+      clearTimeout(scrollSaveTimer);
+      scrollSaveTimer = setTimeout(saveLastPosition, 600);
+    }, { passive: true });
 
     /* ── Helpers ─────────────────────────────────────────────────────── */
     function isIOS() {
@@ -440,7 +595,7 @@
     /* ── Clear ───────────────────────────────────────────────────────── */
     function clearPages() {
       for (const p of pages) { try { URL.revokeObjectURL(p.url); } catch {} }
-      pages = []; currentIndex = 0;
+      pages = []; currentIndex = 0; currentFileName = '';
       scrollView.innerHTML = ''; thumbPanel.innerHTML = '';
       leftPage.src = ''; rightPage.src = ''; singlePage.src = '';
       pageCounter.textContent = '0 / 0';
@@ -450,6 +605,19 @@
       pdfProgressWrap.classList.add('done');
       pdfProgressBar.style.width = '0%';
       pageZoom = 1; applyPageZoom();
+      updateGotoUI();
+      hideResumeToast();
+    }
+
+    /* ── After load: check history ───────────────────────────────────── */
+    function afterLoad(fileName) {
+      currentFileName = fileName;
+      updateGotoUI();
+      const last = getLastPosition(fileName);
+      if (last > 0 && last < pages.length) {
+        // มีประวัติ → แสดง toast
+        showResumeToast(last);
+      }
     }
 
     /* ── Loaders ─────────────────────────────────────────────────────── */
@@ -464,6 +632,7 @@
       currentIndex = 0;
       setStatus(`โหลดแล้ว ${pages.length} หน้า`);
       renderThumbs(); updateView();
+      afterLoad(files.map(f => f.name).join('|'));
     }
 
     async function loadCbz(file) {
@@ -481,6 +650,7 @@
       currentIndex = 0;
       setStatus(`โหลดแล้ว ${pages.length} หน้า`);
       renderThumbs(); updateView();
+      afterLoad(file.name);
     }
 
     /* ── PDF Loader ──────────────────────────────────────────────────── */
@@ -498,17 +668,13 @@
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const total = pdf.numPages;
 
-        // แสดง progress bar
         pdfProgressWrap.classList.remove('done');
 
-        // Scale เป้าหมาย: ความกว้าง CSS ~800px × DPR ≤ 2
         const dpr        = Math.min(window.devicePixelRatio || 1, 2);
         const targetPx   = Math.min(960, (window.screen.width || 390)) * dpr;
-
-        const baseName = file.name.replace(/\.pdf$/i, '');
+        const baseName   = file.name.replace(/\.pdf$/i, '');
 
         for (let i = 1; i <= total; i++) {
-          // อัปเดต progress
           const pct = Math.round((i - 1) / total * 100);
           pdfProgressBar.style.width = pct + '%';
           setStatus(`PDF: แปลงหน้า ${i} / ${total}`);
@@ -523,31 +689,29 @@
           canvas.height   = Math.round(viewport.height);
 
           const ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#ffffff';  // พื้นขาวสำหรับ PDF โปร่งใส
+          ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
           await page.render({ canvasContext: ctx, viewport }).promise;
 
-          // canvas → JPEG blob → object URL
           const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
           pages.push({
             name: `${baseName} p${String(i).padStart(3, '0')}`,
             url: URL.createObjectURL(blob)
           });
 
-          // อัปเดต view แบบ progressive (หน้าแรก + ทุก 10 หน้า + หน้าสุดท้าย)
           if (i === 1 || i % 10 === 0 || i === total) {
-            renderThumbs(); updateView();
+            renderThumbs(); updateView(); updateGotoUI();
           }
         }
 
-        // ซ่อน progress bar
         pdfProgressBar.style.width = '100%';
         setTimeout(() => pdfProgressWrap.classList.add('done'), 400);
 
         currentIndex = 0;
         setStatus(`PDF: ${total} หน้า`);
         renderThumbs(); updateView();
+        afterLoad(file.name);
 
       } catch (err) {
         console.error(err);
@@ -570,7 +734,7 @@
         } else if (isZipFile(first.name)) {
           await loadCbz(first);
         } else if (isPdfFile(first.name)) {
-          await loadPdf(first);   // เผื่อ PDF จาก drop
+          await loadPdf(first);
         } else {
           setStatus('รองรับ .cbz, .zip, .pdf และไฟล์รูปภาพ');
         }
@@ -604,12 +768,10 @@
       const total    = pages.length;
 
       if (existing < total) {
-        // เพิ่มเฉพาะหน้าที่ยังไม่มี (รองรับ PDF progressive load)
         for (let i = existing; i < total; i++) {
           scrollView.appendChild(makeScrollPage(i));
         }
       } else if (existing > total) {
-        // Rebuild หลัง clearPages
         const savedTop  = reader.scrollTop;
         const prevH     = reader.scrollHeight;
         scrollView.innerHTML = '';
@@ -620,7 +782,6 @@
           });
         }
       } else {
-        // จำนวนเท่ากัน → อัปเดต src ถ้าจำเป็น
         for (let i = 0; i < total; i++) {
           const img = scrollView.children[i]?.querySelector('img');
           if (img && img.src !== pages[i].url) img.src = pages[i].url;
@@ -697,6 +858,7 @@
       if (currentIndex >= max) return;
       currentIndex = Math.min(currentIndex + (mode === 'book' ? getBookStep() : 1), max);
       updateView(); syncScrollToCurrent();
+      saveLastPosition();
     }
     function prevPage() {
       if (!pages.length || busy) return;
@@ -704,12 +866,15 @@
       currentIndex = Math.max(0, currentIndex - (mode === 'book' ? getBookStep() : 1));
       if (isSpreadView()) normalizeSpreadIndex();
       updateView(); syncScrollToCurrent();
+      saveLastPosition();
     }
-    function firstPage() { currentIndex = 0; updateView(); syncScrollToCurrent(); }
+    function firstPage() {
+      currentIndex = 0; updateView(); syncScrollToCurrent(); saveLastPosition();
+    }
     function lastPage() {
       currentIndex = getMaxStartIndex();
       if (isSpreadView()) normalizeSpreadIndex();
-      updateView(); syncScrollToCurrent();
+      updateView(); syncScrollToCurrent(); saveLastPosition();
     }
     function syncScrollToCurrent() {
       if (mode !== 'scroll') return;
@@ -808,6 +973,7 @@
     setMode(mode);
     setThumbsOpen(thumbsOpen);
     updateView();
+    updateGotoUI();
 
     let resizeRaf = null;
     window.addEventListener('resize', () => {
@@ -819,9 +985,10 @@
     window.addEventListener('orientationchange', () => {
       setTimeout(() => { updateOrientationState(); updateView(); }, 100);
     });
+
+    // บันทึกตำแหน่งก่อนปิด tab
+    window.addEventListener('pagehide',     saveLastPosition);
+    window.addEventListener('beforeunload', saveLastPosition);
   </script>
 </body>
 </html>
-
-
-
